@@ -62,7 +62,7 @@ export default function App() {
       </div>
 
       {/* Body */}
-      <div className="flex-1 p-4 overflow-y-auto">
+      <div className="flex-1 p-4 overflow-y-auto pb-20">
         <AnimatePresence mode="wait">
           {tab === "home" && <Home t={t} setTab={setTab} />}
           {tab === "mandi" && <Mandi t={t} />}
