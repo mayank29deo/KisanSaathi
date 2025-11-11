@@ -1,97 +1,118 @@
+import { useState } from "react";
 import Card from "../components/Card";
 import PrimaryButton from "../components/PrimaryButton";
-import { HandCoins, Landmark, Building2 } from "lucide-react";
+import MapPreview from "../components/MapPreview";
+import { geocodePlace, fetchOSMBanks, haversineKm, deriveType } from "../utils/osm";
 
 export default function Finance({ t }) {
+  const [place, setPlace] = useState("");
+  const [radius, setRadius] = useState(10);
+  const [latlon, setLatlon] = useState(null);
+  const [types, setTypes] = useState({ bank: true, atm: true });
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function useGeo() {
+    setError(null); setLoading(true);
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      setLatlon({ lat: pos.coords.latitude, lon: pos.coords.longitude, label: "GPS" });
+      setLoading(false);
+    }, () => { setError("geo"); setLoading(false); });
+  }
+
+  async function geocode() {
+    try { setError(null); setLoading(true); const g = await geocodePlace(place); setLatlon({ lat: g.lat, lon: g.lon, label: g.display }); }
+    catch { setError("geocode"); }
+    finally { setLoading(false); }
+  }
+
+  async function search() {
+    if (!latlon) { setError("noloc"); return; }
+    try {
+      setError(null); setLoading(true); setResults([]);
+      const elems = await fetchOSMBanks(latlon.lat, latlon.lon, radius);
+      let items = (elems || []).map((e) => ({ id: `${e.type}/${e.id}`, name: e.tags?.name || (e.tags?.amenity?.toUpperCase() || "Bank/ATM"), lat: e.lat, lon: e.lon, tags: e.tags || {} }))
+        .filter((x) => Number.isFinite(x.lat) && Number.isFinite(x.lon))
+        .map((x) => ({ ...x, distKm: haversineKm(latlon.lat, latlon.lon, x.lat, x.lon), type: ((x.tags.amenity || '').toLowerCase() === 'atm') ? 'atm' : 'bank' }));
+      items = items.filter((x) => types[x.type]);
+      items.sort((a, b) => (a.distKm || 0) - (b.distKm || 0));
+      setResults(items.slice(0, 50));
+    } catch {
+      setError("overpass");
+    } finally { setLoading(false); }
+  }
+
+  function toggleType(k) { setTypes((s) => ({ ...s, [k]: !s[k] })); }
+
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-extrabold text-green-800">
-        {t.finance || "Finance & Subsidy Assistance (वित्तीय सहायता)"}
-      </h1>
-
-      {/* Existing Cards */}
-      <Card className="space-y-3">
-        <div className="flex items-center gap-2 text-green-700 font-semibold text-lg">
-          <HandCoins className="w-5 h-5" />
-          <span>{t.banksNear || "Find Banks & ATMs Near You"}</span>
+    <div className="space-y-4">
+      <h1 className="text-xl font-extrabold">{t.finance || "Finance"}</h1>
+      <Card>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+          <div className="md:col-span-2">
+            <div className="text-sm font-semibold mb-1">{t.location || "Location (city or PIN)"}</div>
+            <input className="border rounded-xl px-3 py-2 w-full" placeholder="e.g., 110001 or Hisar" value={place} onChange={(e) => setPlace(e.target.value)} />
+          </div>
+          <div>
+            <div className="text-sm font-semibold mb-1">{t.radiusKm || "Radius (km)"}</div>
+            <input type="number" min={1} max={50} className="border rounded-xl px-3 py-2 w-full" value={radius} onChange={(e) => setRadius(parseFloat(e.target.value || "10"))} />
+          </div>
+          <div className="flex gap-2">
+            <PrimaryButton onClick={geocode}>{t.search || "Search"}</PrimaryButton>
+            <PrimaryButton onClick={useGeo}>{t.useMyLocation || "Use my location"}</PrimaryButton>
+          </div>
+          <div className="text-right">
+            <PrimaryButton onClick={search}>{t.findBanks || "Find banks"}</PrimaryButton>
+          </div>
         </div>
-        <p className="text-sm text-gray-600">
-          Locate nearby banking services, agricultural finance offices, or ATMs for easy transactions.
-        </p>
-        <PrimaryButton onClick={() => window.open("https://maps.google.com/search/banks+near+me", "_blank")}>
-          {t.openMap || "Open in Google Maps"}
-        </PrimaryButton>
+        {latlon && (<div className="text-xs text-gray-600 mt-2">📍 {latlon.label || `${latlon.lat.toFixed(4)}, ${latlon.lon.toFixed(4)}`}</div>)}
+        {error && <div className="text-xs text-rose-600 mt-2">
+          {error === 'geo' ? 'Location permission denied.' : error === 'geocode' ? 'Could not find that place.' : error === 'overpass' ? 'Bank/ATM data currently unavailable.' : 'Please set a location first.'}
+        </div>}
       </Card>
 
-      <Card className="space-y-3">
-        <div className="flex items-center gap-2 text-green-700 font-semibold text-lg">
-          <Landmark className="w-5 h-5" />
-          <span>{t.agriLoans || "Agriculture Loans (कृषि ऋण)"}</span>
+      {latlon && (
+        <Card>
+          <div className="font-semibold mb-2">Map</div>
+          <MapPreview center={latlon} markers={results} radiusKm={radius} />
+        </Card>
+      )}
+
+      <Card>
+        <div className="text-sm font-semibold mb-2">Types</div>
+        <div className="flex flex-wrap gap-2 items-center">
+          {["bank","atm"].map((k) => (
+            <label key={k} className={`px-3 py-1.5 rounded-xl border cursor-pointer ${types[k] ? "bg-emerald-50 text-emerald-700" : ""}`}>
+              <input type="checkbox" className="mr-2" checked={!!types[k]} onChange={() => toggleType(k)} />
+              {k.toUpperCase()}
+            </label>
+          ))}
         </div>
-        <p className="text-sm text-gray-600">
-          Explore different loan options available for farmers via NABARD and commercial banks.
-        </p>
-        <PrimaryButton onClick={() => window.open("https://www.nabard.org", "_blank")}>
-          {t.learnMore || "Visit NABARD Website"}
-        </PrimaryButton>
       </Card>
 
-      {/* 🌿 NEW SECTION: Government Scheme Posters */}
-      <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border border-emerald-200 rounded-2xl shadow-sm p-6 space-y-4">
-        <div className="text-lg font-bold text-green-900 flex items-center gap-2">
-          <Building2 className="w-6 h-6 text-green-700" />
-          <span>Government Schemes & Subsidies (सरकारी योजनाएँ)</span>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-4">
-          {/* PM-Kisan Yojana */}
-          <div className="bg-white rounded-xl p-4 border border-green-200 hover:shadow-lg transition">
-            <div className="text-green-800 font-semibold mb-1">PM-KISAN (प्रधानमंत्री किसान सम्मान निधि)</div>
-            <p className="text-sm text-gray-600 mb-2">
-              ₹6,000 annual income support directly transferred to eligible farmer accounts in 3 installments.
-            </p>
-            <PrimaryButton onClick={() => window.open("https://pmkisan.gov.in", "_blank")}>
-              Visit Official Portal →
-            </PrimaryButton>
-          </div>
-
-          {/* Kisan Credit Card */}
-          <div className="bg-white rounded-xl p-4 border border-green-200 hover:shadow-lg transition">
-            <div className="text-green-800 font-semibold mb-1">Kisan Credit Card (किसान क्रेडिट कार्ड)</div>
-            <p className="text-sm text-gray-600 mb-2">
-              Instant access to short-term credit for seeds, fertilizers, and machinery at low interest rates.
-            </p>
-            <PrimaryButton onClick={() => window.open("https://www.mygov.in/kcc", "_blank")}>
-              Apply Now →
-            </PrimaryButton>
-          </div>
-
-          {/* PMFBY */}
-          <div className="bg-white rounded-xl p-4 border border-green-200 hover:shadow-lg transition">
-            <div className="text-green-800 font-semibold mb-1">PMFBY (प्रधानमंत्री फसल बीमा योजना)</div>
-            <p className="text-sm text-gray-600 mb-2">
-              Crop insurance coverage against natural calamities with simplified claim process and low premium.
-            </p>
-            <PrimaryButton onClick={() => window.open("https://pmfby.gov.in", "_blank")}>
-              Learn More →
-            </PrimaryButton>
-          </div>
-
-          {/* Soil Health Card */}
-          <div className="bg-white rounded-xl p-4 border border-green-200 hover:shadow-lg transition">
-            <div className="text-green-800 font-semibold mb-1">Soil Health Card (मृदा स्वास्थ्य कार्ड योजना)</div>
-            <p className="text-sm text-gray-600 mb-2">
-              Free soil testing and reports for better fertilizer use and yield improvement.
-            </p>
-            <PrimaryButton onClick={() => window.open("https://soilhealth.dac.gov.in", "_blank")}>
-              Check Details →
-            </PrimaryButton>
-          </div>
-        </div>
-
-        {/* Note */}
-        <div className="text-xs text-gray-600 italic text-center pt-2">
-          For latest government updates, visit <a href="https://agricoop.gov.in" className="text-green-700 underline">agricoop.gov.in</a>
+      <Card>
+        <div className="font-semibold mb-2">Banks & ATMs near you</div>
+        {loading && <div className="text-sm text-gray-600">Loading…</div>}
+        {!loading && results.length === 0 && <div className="text-sm text-gray-600">{t.noneFound || "No centres found in this area."}</div>}
+        <div className="space-y-3">
+          {results.map((p) => (
+            <div key={p.id} className="flex items-start justify-between border-b last:border-none border-gray-100 py-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="font-semibold text-sm">{p.name}</div>
+                  <span className={`px-2 py-0.5 rounded-lg text-xs font-semibold ${p.type === 'atm' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'}`}>{p.type.toUpperCase()}</span>
+                </div>
+                <div className="text-xs text-gray-500 mt-0.5">{p.tags?.addr_full || p.tags?.['addr:full'] || p.tags?.['addr:street'] || ''}</div>
+                {p.tags?.opening_hours && <div className="text-xs text-gray-600 mt-0.5">Hours: {p.tags.opening_hours}</div>}
+              </div>
+              <div className="flex gap-2 mt-1">
+                {(p.tags?.phone || p.tags?.['contact:phone']) && <a className="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100" href={`tel:${p.tags['contact:phone'] || p.tags.phone}`}>Call</a>}
+                <a className="px-3 py-1.5 rounded-lg bg-green-50 hover:bg-green-100" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}&query=${p.lat},${p.lon}`} target="_blank" rel="noreferrer">Directions</a>
+                <div className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700">{(p.distKm || 0).toFixed(1)} km</div>
+              </div>
+            </div>
+          ))}
         </div>
       </Card>
     </div>
