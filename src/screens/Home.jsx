@@ -88,16 +88,15 @@ export default function Home({ t, setTab }) {
 
   const current = live?.current_weather;
 
-  // 🌤️ Weather icon mapper (emoji fallback - safe and lightweight)
   function getWeatherIcon(code) {
-    if (!code) return "☀️"; // default sunny
-    if ([0, 1].includes(code)) return "☀️"; // clear
-    if ([2, 3].includes(code)) return "🌤️"; // partly cloudy
-    if ([45, 48].includes(code)) return "🌫️"; // fog
-    if ([51, 53, 55, 61, 63, 65].includes(code)) return "🌧️"; // rain
-    if ([71, 73, 75].includes(code)) return "❄️"; // snow
-    if ([95, 96, 99].includes(code)) return "⛈️"; // thunderstorm
-    return "☁️"; // fallback
+    if (!code) return "☀️";
+    if ([0, 1].includes(code)) return "☀️";
+    if ([2, 3].includes(code)) return "🌤️";
+    if ([45, 48].includes(code)) return "🌫️";
+    if ([51, 53, 55, 61, 63, 65].includes(code)) return "🌧️";
+    if ([71, 73, 75].includes(code)) return "❄️";
+    if ([95, 96, 99].includes(code)) return "⛈️";
+    return "☁️";
   }
 
   return (
@@ -107,7 +106,7 @@ export default function Home({ t, setTab }) {
       {/* Weather Section */}
       <Card className="overflow-hidden">
         <div className="font-semibold mb-2 flex items-center gap-2">
-          <span>{t.weatherToday || "Today's Weather"}</span>
+          <span>🌦️ {t.weatherToday || "Today's Weather"}</span>
           <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
         </div>
 
@@ -125,11 +124,9 @@ export default function Home({ t, setTab }) {
                 )}
               </div>
             </div>
-            <div className="text-right">
-              <PrimaryButton onClick={getWeather}>
-                {wloading ? "…" : t.useMyLocation || "Use my location"}
-              </PrimaryButton>
-            </div>
+            <PrimaryButton onClick={getWeather}>
+              {wloading ? "…" : t.useMyLocation || "Use my location"}
+            </PrimaryButton>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
@@ -159,13 +156,14 @@ export default function Home({ t, setTab }) {
       {/* Health Map Section */}
       <Card>
         <div className="flex items-center justify-between mb-2">
-          <div className="font-semibold">
-            {t.nearbyHealthMap || "Nearby Health Map"}
+          <div className="font-semibold flex items-center gap-2">
+            🏥 {t.nearbyHealthMap || "Nearby Health Map"}
           </div>
           <PrimaryButton onClick={getNearbyHealth}>
             {hLoading ? "…" : t.exploreMap || "Explore map"}
           </PrimaryButton>
         </div>
+
         {hError && (
           <div className="text-xs text-rose-600 mb-2">
             {hError === "geo"
@@ -173,21 +171,23 @@ export default function Home({ t, setTab }) {
               : "Could not fetch health centres."}
           </div>
         )}
+
         {hLatlon ? (
           <MapPreview center={hLatlon} markers={hMarkers} radiusKm={hRadius} />
         ) : (
           <div className="text-sm text-gray-600">
-            Tap “{t.exploreMap || "Explore map"}” to see hospitals/clinics
-            around you.
+            Tap “{t.exploreMap || "Explore map"}” to see hospitals/clinics around you.
           </div>
         )}
       </Card>
 
-      {/* Navigation Cards */}
+      {/* Mandi Card */}
       <Card>
-        <div className="font-semibold mb-2">{t.mandi || "Mandi"}</div>
+        <div className="font-semibold mb-2 flex items-center gap-2">
+          📈 {t.mandi || "Mandi Prices"}
+        </div>
         <div className="text-sm text-gray-600 mb-2">
-          See quick prices then open full page.
+          Prices rising this week — check updated mandi rates!
         </div>
         <PrimaryButton onClick={() => setTab("mandi")}>
           Open Mandi →
@@ -195,8 +195,11 @@ export default function Home({ t, setTab }) {
       </Card>
 
       <div className="grid md:grid-cols-3 gap-4">
+        {/* Finance */}
         <Card>
-          <div className="font-semibold mb-2">{t.finance || "Finance"}</div>
+          <div className="font-semibold mb-2 flex items-center gap-2">
+            🏦 {t.finance || "Finance"}
+          </div>
           <div className="text-gray-500 text-sm mb-2">
             {t.banksNear || "Banks near you"}
           </div>
@@ -204,17 +207,23 @@ export default function Home({ t, setTab }) {
             Open finance tools →
           </PrimaryButton>
         </Card>
+
+        {/* Advisory */}
         <Card>
-          <div className="font-semibold mb-2">{t.advisory || "Advisory"}</div>
-          <div className="text-gray-500 text-sm mb-2">
-            Crop rotation & tips.
+          <div className="font-semibold mb-2 flex items-center gap-2">
+            🌱 {t.advisory || "Advisory"}
           </div>
+          <div className="text-gray-500 text-sm mb-2">Crop rotation & tips.</div>
           <PrimaryButton onClick={() => setTab("advisory")}>
             Find rotation support →
           </PrimaryButton>
         </Card>
+
+        {/* Health */}
         <Card>
-          <div className="font-semibold mb-2">{t.health || "Health"}</div>
+          <div className="font-semibold mb-2 flex items-center gap-2">
+            🏥 {t.health || "Health"}
+          </div>
           <div className="text-gray-500 text-sm mb-2">
             Locate PHC/CHC, hospitals, clinics and pharmacies.
           </div>
@@ -224,8 +233,11 @@ export default function Home({ t, setTab }) {
         </Card>
       </div>
 
+      {/* Detector */}
       <Card>
-        <div className="font-semibold mb-2">{t.detect || "Detect"}</div>
+        <div className="font-semibold mb-2 flex items-center gap-2">
+          📸 {t.detect || "Detect"}
+        </div>
         <div className="text-gray-500 text-sm mb-2">
           Use camera or upload a photo to check common issues.
         </div>
