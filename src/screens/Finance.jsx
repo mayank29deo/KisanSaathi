@@ -3,6 +3,10 @@ import Card from "../components/Card";
 import PrimaryButton from "../components/PrimaryButton";
 import MapPreview from "../components/MapPreview";
 import { geocodePlace, fetchOSMBanks, haversineKm } from "../utils/osm";
+import { motion, useScroll, useTransform } from "framer-motion";
+import { useRef } from "react";
+
+
 
 export default function Finance({ t }) {
   const [place, setPlace] = useState("");
@@ -269,47 +273,65 @@ export default function Finance({ t }) {
               title: "प्रधानमंत्री किसान सम्मान निधि (PM-KISAN)",
               desc: "₹6,000 annual income support credited directly to eligible farmer accounts.",
               link: "https://pmkisan.gov.in",
-              logo: "https://upload.wikimedia.org/wikipedia/en/8/8f/PM-Kisan_logo.png",
+              logo: "/assets/pmkisan.jpg",
             },
             {
               title: "किसान क्रेडिट कार्ड (Kisan Credit Card)",
               desc: "Quick access to credit for seeds, fertilizers & machinery at low interest.",
               link: "https://www.mygov.in/kcc",
-              logo: "https://upload.wikimedia.org/wikipedia/en/2/2d/Indian_Bank_logo.png",
+              logo: "/assets/Revised-Kisan-credit-card-scheme.jpg",
             },
             {
               title: "प्रधानमंत्री फसल बीमा योजना (PMFBY)",
               desc: "Crop insurance against natural calamities with simple claims & low premiums.",
               link: "https://pmfby.gov.in",
-              logo: "https://pmfby.gov.in/images/pmfby_logo.png",
+              logo: "/assets/pmfby.jpg",
             },
             {
               title: "मृदा स्वास्थ्य कार्ड योजना (Soil Health Card)",
               desc: "Free soil testing & reports for improving productivity & yield quality.",
               link: "https://soilhealth.dac.gov.in",
-              logo: "https://soilhealth.dac.gov.in/assets/images/logo.png",
+              logo: "/assets/soilhealthcard.jpg",
             },
-          ].map((scheme) => (
-            <div
-              key={scheme.title}
-              className="bg-white rounded-xl p-4 border border-green-200 shadow-sm hover:shadow-lg transition relative overflow-hidden"
-            >
-              <img
-                src={scheme.logo}
-                alt={scheme.title}
-                className="absolute opacity-10 right-3 top-3 w-20"
-              />
-              <div className="text-green-800 font-bold mb-1">
-                {scheme.title}
-              </div>
-              <p className="text-sm text-gray-700 mb-3">{scheme.desc}</p>
-              <PrimaryButton
-                onClick={() => window.open(scheme.link, "_blank")}
+          ].map((scheme) => {
+            const cardRef = useRef(null);
+
+            // Track scroll position relative to this card
+            const { scrollYProgress } = useScroll({
+              target: cardRef,
+              offset: ["start end", "end start"], 
+            });
+
+            // Move image upward based on scroll
+            const y = useTransform(scrollYProgress, [0, 1], ["15%", "-45%"]); 
+            // adjust -80 to -120 for stronger parallax
+
+            return (
+              <div
+                key={scheme.title}
+                ref={cardRef}
+                className="relative overflow-hidden bg-white rounded-xl border border-green-200 shadow-sm hover:shadow-lg transition"
               >
-                Learn More →
-              </PrimaryButton>
-            </div>
-          ))}
+                {/* Parallax background image */}
+                <motion.img
+                  src={scheme.logo}
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-contain pointer-events-none bg-white"
+                  style={{ y, opacity: 0.4, scale: 2.25 }}
+                />
+
+                {/* Foreground content */}
+                <div className="relative p-4">
+                  <div className="text-green-800 font-bold mb-1">{scheme.title}</div>
+                  <p className="text-sm text-gray-700 mb-3">{scheme.desc}</p>
+
+                  <PrimaryButton onClick={() => window.open(scheme.link, "_blank")}>
+                    Learn More →
+                  </PrimaryButton>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="text-xs text-gray-700 text-center italic border-t border-green-300 pt-3">
