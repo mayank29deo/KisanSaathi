@@ -174,6 +174,93 @@ const STRINGS = {
     alreadyRegistered: "पहले से पंजीकृत हैं? यहाँ लॉगिन करें",
     newUser: "नए उपयोगकर्ता हैं? यहाँ पंजीकरण करें",
   },
+    bn: {
+    // App & Navigation
+    app: "কিষাণ সাথী",
+    home: "হোম",
+    mandi: "মান্ডি",
+    finance: "আর্থিক সহায়তা",
+    advisory: "পরামর্শ",
+    detect: "ফসল সনাক্তকরণ",
+    health: "স্বাস্থ্য কেন্দ্র",
+    sell: "বিক্রি",
+    account: "অ্যাকাউন্ট",
+    settings: "সেটিংস",
+
+    // Home screen
+    welcome: "কিষাণ সাথীতে আপনাকে স্বাগতম",
+    weatherToday: "আজকের আবহাওয়া",
+    useMyLocation: "আমার অবস্থান ব্যবহার করুন",
+    weatherUnavailable: "আবহাওয়ার তথ্য পাওয়া যাচ্ছে না",
+    nearbyHealthMap: "নিকটবর্তী স্বাস্থ্য কেন্দ্র",
+    exploreMap: "মানচিত্র দেখুন",
+    mandiPrices: "মান্ডির দাম",
+    financeTools: "আর্থিক পরিষেবা",
+    cropAdvisory: "ফসল পরামর্শ",
+    soilHealth: "মাটি ও ফসলের স্বাস্থ্য",
+    detectPrompt: "পাতার ছবি তুলে সমস্যার সনাক্তকরণ করুন",
+    openMandi: "মান্ডি খুলুন →",
+    openFinance: "আর্থিক পরিষেবা দেখুন →",
+    openAdvisory: "পরামর্শ দেখুন →",
+    openHealth: "স্বাস্থ্য কেন্দ্র দেখুন →",
+    openDetector: "ফসল সনাক্তকরণ খুলুন →",
+
+    // Finance
+    location: "অবস্থান (শহর বা পিন কোড)",
+    radiusKm: "ব্যাসার্ধ (কিমি)",
+    search: "অনুসন্ধান করুন",
+    useMyLocationBtn: "আমার অবস্থান ব্যবহার করুন",
+    findBanks: "ব্যাংক খুঁজুন",
+    banksNear: "আপনার নিকটবর্তী ব্যাংক",
+    noneFound: "এই এলাকায় কোনো কেন্দ্র পাওয়া যায়নি।",
+    bank: "ব্যাংক",
+    atm: "এটিএম",
+
+    // Health
+    findCenters: "কেন্দ্র খুঁজুন",
+    types: "ধরন",
+    services: "পরিষেবা",
+    govtOnly: "শুধু সরকারি (PHC/CHC)",
+    hospitalsNear: "নিকটবর্তী হাসপাতাল ও ক্লিনিক",
+    clearFilters: "ফিল্টার মুছুন",
+    heatstroke: "হিটস্ট্রোক / লু",
+    poisoning: "বিষক্রিয়া",
+    trauma: "আঘাত / পোড়া",
+    cachedBanner: "অফলাইন তথ্য দেখানো হচ্ছে (পুরনো হতে পারে)।",
+    healthAdvisory: "নিকটবর্তী হাসপাতাল, ক্লিনিক ও ওষুধের দোকানের তথ্য।",
+
+    // Detector
+    startCamera: "ক্যামেরা চালু করুন",
+    stopCamera: "ক্যামেরা বন্ধ করুন",
+    uploadPhoto: "ছবি আপলোড করুন",
+    analyze: "বিশ্লেষণ করুন",
+    predictedDisease: "সম্ভাব্য সমস্যা",
+    confidence: "নিশ্চয়তার মাত্রা",
+    recommendation: "পরামর্শ",
+    healthyLeaf: "সুস্থ পাতা",
+    nutrientDeficiency: "সম্ভাব্য পুষ্টির ঘাটতি",
+    possibleDisease: "সম্ভাব্য রোগ সংক্রমণ",
+    detectorDisclaimer:
+      "এটি প্রাথমিক নির্দেশনা মাত্র। অনুগ্রহ করে নিকটবর্তী কৃষি বিশেষজ্ঞের সাথে নিশ্চিত করুন।",
+
+    // Advisory
+    cropRotation: "ফসল চক্রের পরামর্শ",
+    fertilizerGuide: "সার ব্যবহারের নির্দেশিকা",
+    pestControl: "কীট ও রোগ নিয়ন্ত্রণ",
+    irrigation: "সেচ সময়সূচি",
+    soilCare: "মাটির যত্ন",
+
+    // Mandi
+    mandiUpdates: "সর্বশেষ মান্ডি আপডেট",
+    mandiUnavailable: "এই মুহূর্তে মান্ডির তথ্য উপলব্ধ নয়।",
+
+    // Account / Auth
+    register: "নিবন্ধন করুন",
+    login: "লগইন করুন",
+    namePlaceholder: "আপনার নাম লিখুন",
+    alreadyRegistered: "আগে নিবন্ধিত? এখানে লগইন করুন",
+    newUser: "নতুন ব্যবহারকারী? এখানে নিবন্ধন করুন",
+  },
 };
 
 export default STRINGS;
