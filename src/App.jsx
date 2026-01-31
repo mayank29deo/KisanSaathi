@@ -24,6 +24,19 @@ export default function App() {
 
   const t = STRINGS[lang];
 
+  // 🔹 Load saved language on app start
+  useEffect(() => {
+    const savedLang = localStorage.getItem("lang");
+    if (savedLang && STRINGS[savedLang]) {
+      setLang(savedLang);
+    }
+  }, []);
+
+  // 🔹 Save language whenever it changes
+  useEffect(() => {
+    localStorage.setItem("lang", lang);
+  }, [lang]);
+
   function onLogin(name) {
     setFarmerName(name);
     setTab("home");
@@ -40,22 +53,26 @@ export default function App() {
         <div className="text-xl font-bold">
           🌾 {t.app} {farmerName && <span className="text-sm">— {farmerName}</span>}
         </div>
-        <div className="flex gap-2">
+
+        <div className="flex gap-2 items-center">
+          {/* 🌐 Language Selector */}
           <select
             value={lang}
             onChange={(e) => setLang(e.target.value)}
-            className="border rounded p-1"
+            className="border rounded px-2 py-1 text-sm bg-white"
           >
             <option value="en">English</option>
             <option value="hi">हिन्दी</option>
+            <option value="bn">বাংলা</option>
           </select>
+
           {farmerName ? (
             <button onClick={logout} className="text-sm underline">
-              {t.logout}
+              {t.logout || "Logout"}
             </button>
           ) : (
             <button onClick={() => setTab("account")} className="text-sm underline">
-              {t.signIn}
+              {t.signIn || "Sign In"}
             </button>
           )}
         </div>
