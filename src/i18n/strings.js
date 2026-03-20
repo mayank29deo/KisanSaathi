@@ -85,6 +85,27 @@ const STRINGS = {
     namePlaceholder: "Enter your name",
     alreadyRegistered: "Already registered? Login here",
     newUser: "New user? Register here",
+
+    // CropRecommendation
+    crop_title: "Crop Recommendation",
+    state: "State",
+    season: "Season",
+    select_state: "Select State",
+    select_season: "Select Season",
+    kharif: "Kharif",
+    rabi: "Rabi",
+    zaid: "Zaid",
+    nitrogen: "Nitrogen (N)",
+    phosphorus: "Phosphorus (P)",
+    potassium: "Potassium (K)",
+    ph: "Soil pH",
+    rainfall: "Rainfall (mm)",
+    soil_moisture: "Soil Moisture",
+    min_temp: "Minimum Temperature",
+    max_temp: "Maximum Temperature",
+    predict: "Recommend Crop",
+    predicting: "Predicting...",
+    result: "Recommended Crop"
   },
 
   hi: {
@@ -173,6 +194,27 @@ const STRINGS = {
     namePlaceholder: "अपना नाम दर्ज करें",
     alreadyRegistered: "पहले से पंजीकृत हैं? यहाँ लॉगिन करें",
     newUser: "नए उपयोगकर्ता हैं? यहाँ पंजीकरण करें",
+
+    // CropRecommendation
+    crop_title: "फसल सुझाव",
+    state: "राज्य",
+    season: "मौसम",
+    select_state: "राज्य चुनें",
+    select_season: "मौसम चुनें",
+    kharif: "खरीफ",
+    rabi: "रबी",
+    zaid: "जायद",
+    nitrogen: "नाइट्रोजन (N)",
+    phosphorus: "फॉस्फोरस (P)",
+    potassium: "पोटैशियम (K)",
+    ph: "मिट्टी का pH",
+    rainfall: "वर्षा (मिमी)",
+    soil_moisture: "मिट्टी की नमी",
+    min_temp: "न्यूनतम तापमान",
+    max_temp: "अधिकतम तापमान",
+    predict: "फसल सुझाएँ",
+    predicting: "भविष्यवाणी हो रही है...",
+    result: "अनुशंसित फसल"
   },
     bn: {
     // App & Navigation
