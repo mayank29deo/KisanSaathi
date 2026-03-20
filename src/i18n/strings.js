@@ -87,7 +87,7 @@ const STRINGS = {
     newUser: "New user? Register here",
 
     // CropRecommendation
-    crop_title: "Crop Recommendation",
+    crop_title: "Crop",
     state: "State",
     season: "Season",
     select_state: "Select State",
