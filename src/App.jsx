@@ -79,7 +79,7 @@ export default function App() {
         <TabButton active={tab === "detect"} label={t.detect} onClick={() => setTab("detect")} icon="📷" />
         <TabButton active={tab === "health"} label={t.health} onClick={() => setTab("health")} icon="🏥" />
         <TabButton active={tab === "sell"} label={t.sell} onClick={() => setTab("sell")} icon="🛒" />
-        <TabButton active={tab === "crop"} label="Crop" onClick={() => setTab("crop")} icon="🌾" 
+        <TabButton active={tab === "crop"} label={t.crop_title} onClick={() => setTab("crop")} icon="🌾" 
 />
         
         
