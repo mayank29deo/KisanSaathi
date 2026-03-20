@@ -10,48 +10,31 @@ import Advisory from "./screens/Advisory";
 import Detector from "./screens/Detector";
 import Health from "./screens/Health";
 import Sell from "./screens/Sell";
-import Auth from "./screens/Auth";
+import CropRecommendation from "./screens/CropRecommendation";
+
+
+
 
 // Components
 import TabButton from "./components/TabButton";
 
-const TABS = ["home", "mandi", "finance", "advisory", "detect", "health", "sell", "account"];
+const TABS = ["home", "mandi", "finance", "advisory", "detect", "health", "sell", "crop"];
 
 export default function App() {
   const [tab, setTab] = useState("home");
   const [lang, setLang] = useState("en");
-  const [farmerName, setFarmerName] = useState(null);
+ 
 
   const t = STRINGS[lang];
 
-  // 🔹 Load saved language on app start
-  useEffect(() => {
-    const savedLang = localStorage.getItem("lang");
-    if (savedLang && STRINGS[savedLang]) {
-      setLang(savedLang);
-    }
-  }, []);
 
-  // 🔹 Save language whenever it changes
-  useEffect(() => {
-    localStorage.setItem("lang", lang);
-  }, [lang]);
-
-  function onLogin(name) {
-    setFarmerName(name);
-    setTab("home");
-  }
-
-  function logout() {
-    setFarmerName(null);
-  }
 
   return (
     <div className="min-h-screen w-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b bg-white">
         <div className="text-xl font-bold">
-          🌾 {t.app} {farmerName && <span className="text-sm">— {farmerName}</span>}
+          🌾 {t.app}
         </div>
 
         <div className="flex gap-2 items-center">
@@ -66,15 +49,6 @@ export default function App() {
             <option value="bn">বাংলা</option>
           </select>
 
-          {farmerName ? (
-            <button onClick={logout} className="text-sm underline">
-              {t.logout || "Logout"}
-            </button>
-          ) : (
-            <button onClick={() => setTab("account")} className="text-sm underline">
-              {t.signIn || "Sign In"}
-            </button>
-          )}
         </div>
       </div>
 
@@ -88,12 +62,16 @@ export default function App() {
           {tab === "detect" && <Detector t={t} />}
           {tab === "health" && <Health t={t} />}
           {tab === "sell" && <Sell t={t} />}
-          {tab === "account" && <Auth t={t} onLogin={onLogin} />}
+          {tab === "crop" && <CropRecommendation t={t} />}
+          
+          
+
+          
         </AnimatePresence>
       </div>
 
       {/* Tabs */}
-      <div className="fixed bottom-0 inset-x-0 bg-white border-t p-2 grid grid-cols-7">
+      <div className="fixed bottom-0 inset-x-0 bg-white border-t p-2 grid grid-cols-8">
         <TabButton active={tab === "home"} label={t.home} onClick={() => setTab("home")} icon="🏠" />
         <TabButton active={tab === "mandi"} label={t.mandi} onClick={() => setTab("mandi")} icon="🧾" />
         <TabButton active={tab === "finance"} label={t.finance} onClick={() => setTab("finance")} icon="🏦" />
@@ -101,6 +79,10 @@ export default function App() {
         <TabButton active={tab === "detect"} label={t.detect} onClick={() => setTab("detect")} icon="📷" />
         <TabButton active={tab === "health"} label={t.health} onClick={() => setTab("health")} icon="🏥" />
         <TabButton active={tab === "sell"} label={t.sell} onClick={() => setTab("sell")} icon="🛒" />
+        <TabButton active={tab === "crop"} label="Crop" onClick={() => setTab("crop")} icon="🌾" 
+/>
+        
+        
       </div>
     </div>
   );
