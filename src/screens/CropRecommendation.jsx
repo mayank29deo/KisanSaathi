@@ -82,7 +82,7 @@ export default function CropRecommendation({ t }) {
     console.log("Sending data:", data);
 
     try {
-      const API_URL = "https://crop-recommendation-backend-lwng.onrender.com";
+      const API_URL = "https://crop-recommendation-backend-production-d236.up.railway.app";
 
       const response = await fetch(`${API_URL}/predict`, {
         method: "POST",
@@ -93,6 +93,7 @@ export default function CropRecommendation({ t }) {
       });
 
       const result = await response.json();
+      console.log(result);
 
       setResult(result.recommended_crop);
 
