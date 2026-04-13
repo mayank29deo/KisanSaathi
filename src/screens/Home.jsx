@@ -117,9 +117,6 @@ export default function Home({ t, setTab, user }) {
         </p>
       </div>
 
-      {/* Voice Assistant */}
-      <VoiceAssistant t={t} lang={t._lang || "en"} />
-
       {/* Weather Section - Redesigned as a Gradient Hero Card */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 to-green-500 shadow-lg text-white">
         {/* Decorative background circle */}
@@ -183,6 +180,9 @@ export default function Home({ t, setTab, user }) {
           )}
         </div>
       </div>
+
+      {/* Voice Assistant */}
+      <VoiceAssistant t={t} lang={t._lang || "en"} />
 
       {/* Services Grid Title */}
       <div>
