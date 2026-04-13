@@ -39,42 +39,31 @@ export function stopVideoStream(videoEl) {
 }
 
 /**
- * Analyzes pixel data from an ImageData array.
- * Basic heuristic: green vs brown pixels → leaf health.
- * Returns label, confidence, and suggestion.
+ * Sends a base64 image to the /api/analyze-crop serverless function
+ * which calls Claude vision for accurate disease detection.
+ *
+ * @param {string} dataUrl  — full data URL (data:image/jpeg;base64,...)
+ * @returns {Promise<object>}  — structured diagnosis from Claude
  */
-export function analyzeImageData(data) {
-  let greenish = 0,
-    brownish = 0;
+export async function analyzeCropWithClaude(dataUrl) {
+  // Split "data:image/jpeg;base64,<data>" → mimeType + pure base64
+  const [header, imageBase64] = dataUrl.split(",");
+  const mimeType = header.match(/:(.*?);/)?.[1] || "image/jpeg";
 
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i],
-      g = data[i + 1],
-      b = data[i + 2];
-    if (g > r + 10 && g > b + 10) greenish++;
-    if (r > g && g > b && r - g < 50 && g - b < 50 && r > 80) brownish++;
+  const res = await fetch("/api/analyze-crop", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imageBase64, mimeType }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Server error ${res.status}`);
   }
 
-  const total = data.length / 4 || 1;
-  const brownRatio = brownish / total;
-  const greenRatio = greenish / total;
-
-  let label = "Healthy Leaf";
-  let confidence = Math.max(greenRatio, 0.7);
-  let advice = "Your plant appears healthy. Maintain irrigation and fertilizer balance.";
-
-  if (brownRatio > 0.25) {
-    label = "Leaf Blight or Rust (Possible)";
-    confidence = Math.min(0.9, 0.6 + brownRatio);
-    advice =
-      "Possible fungal infection detected. Remove affected leaves and spray copper-based fungicide.";
-  } else if (greenRatio < 0.3) {
-    label = "Nutrient Deficiency (Possible)";
-    confidence = 0.65;
-    advice = "Soil nutrient imbalance. Conduct a soil test and apply balanced NPK with micronutrients.";
-  }
-
-  return { label, confidence, advice };
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || "Analysis failed");
+  return json.diagnosis;
 }
 
 /**
