@@ -102,14 +102,14 @@ export default function Detector({ t }) {
       {/* Camera / Upload Card */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
 
-        {/* Live video */}
-        {streaming && (
-          <div className="relative">
-            <video
-              ref={videoRef}
-              className="w-full max-h-72 object-cover bg-black"
-              autoPlay muted playsInline
-            />
+        {/* Video element — always in DOM so videoRef.current is never null */}
+        <div className={streaming ? "relative" : "hidden"}>
+          <video
+            ref={videoRef}
+            className="w-full max-h-72 object-cover bg-black"
+            autoPlay muted playsInline
+          />
+          {streaming && (
             <div className="absolute inset-0 flex items-end justify-center pb-4">
               <button
                 onClick={captureFrame}
@@ -118,8 +118,8 @@ export default function Detector({ t }) {
                 <span className="w-10 h-10 rounded-full bg-emerald-500 block" />
               </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Image preview */}
         {imageURL && !streaming && (
