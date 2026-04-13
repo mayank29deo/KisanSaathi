@@ -11,7 +11,6 @@ import Advisory from "./screens/Advisory";
 import Detector from "./screens/Detector";
 import Health from "./screens/Health";
 import Sell from "./screens/Sell";
-import CropRecommendation from "./screens/CropRecommendation";
 import AuthScreen from "./screens/AuthScreen";
 
 // Components
@@ -108,20 +107,18 @@ export default function App() {
           {tab === "detect" && <Detector t={t} />}
           {tab === "health" && <Health t={t} />}
           {tab === "sell" && <Sell t={t} />}
-          {tab === "crop" && <CropRecommendation t={t} />}
         </AnimatePresence>
       </div>
 
       {/* Bottom Tabs */}
-      <div className="fixed bottom-0 inset-x-0 bg-white border-t p-2 grid grid-cols-8">
-        <TabButton active={tab === "home"} label={t.home} onClick={() => setTab("home")} icon="🏠" />
-        <TabButton active={tab === "mandi"} label={t.mandi} onClick={() => setTab("mandi")} icon="🧾" />
-        <TabButton active={tab === "finance"} label={t.finance} onClick={() => setTab("finance")} icon="🏦" />
+      <div className="fixed bottom-0 inset-x-0 bg-white border-t p-2 grid grid-cols-7">
+        <TabButton active={tab === "home"}     label={t.home}     onClick={() => setTab("home")}     icon="🏠" />
+        <TabButton active={tab === "mandi"}    label={t.mandi}    onClick={() => setTab("mandi")}    icon="🧾" />
+        <TabButton active={tab === "finance"}  label={t.finance}  onClick={() => setTab("finance")}  icon="🏦" />
         <TabButton active={tab === "advisory"} label={t.advisory} onClick={() => setTab("advisory")} icon="🧑‍🌾" />
-        <TabButton active={tab === "detect"} label={t.detect} onClick={() => setTab("detect")} icon="📷" />
-        <TabButton active={tab === "health"} label={t.health} onClick={() => setTab("health")} icon="🏥" />
-        <TabButton active={tab === "sell"} label={t.sell} onClick={() => setTab("sell")} icon="🛒" />
-        <TabButton active={tab === "crop"} label={t.crop_title} onClick={() => setTab("crop")} icon="🌾" />
+        <TabButton active={tab === "detect"}   label={t.detect}   onClick={() => setTab("detect")}   icon="📷" />
+        <TabButton active={tab === "health"}   label={t.health}   onClick={() => setTab("health")}   icon="🏥" />
+        <TabButton active={tab === "sell"}     label={t.sell}     onClick={() => setTab("sell")}     icon="🛒" />
       </div>
 
       {/* Profile Modal */}

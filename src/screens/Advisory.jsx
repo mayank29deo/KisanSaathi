@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Card from "../components/Card";
 import PrimaryButton from "../components/PrimaryButton";
+import CropRecommendation from "./CropRecommendation";
 
 /**
  * 🌾 Season-wise Crop Advisory (English + Hindi)
@@ -142,82 +143,130 @@ const ADVISORY_DATA = {
   ],
 };
 
+const INNER_TABS = [
+  { id: "tips",   label: "Advisory Tips",      labelKey: "advisoryTips",   icon: "🌱" },
+  { id: "recommend", label: "Recommend Crop",  labelKey: "crop_title",     icon: "🌾" },
+];
+
 export default function Advisory({ t }) {
-  const [search, setSearch] = useState("");
+  const [innerTab, setInnerTab] = useState("tips");
+  const [search,   setSearch]   = useState("");
 
   const filterCrop = (list) =>
-    list.filter((c) =>
-      c.crop.toLowerCase().includes(search.toLowerCase())
-    );
+    list.filter((c) => c.crop.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="p-5 space-y-5">
-      <motion.h2
-        initial={{ y: -10, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="text-2xl font-bold text-brand-dark"
-      >
-        🌱 {t?.advisory || "Crop Advisory"}
-      </motion.h2>
+    <div className="space-y-4 pb-4">
+      {/* Header */}
+      <div className="pt-2 px-1">
+        <h1 className="text-2xl font-extrabold text-gray-900">
+          🧑‍🌾 {t?.advisory || "Advisory"}
+        </h1>
+        <p className="text-gray-500 text-sm mt-1">
+          {t?.advisorySubtitle || "Season-wise crop tips & AI-powered crop recommendation."}
+        </p>
+      </div>
 
-      <Card delay={0.1} className="space-y-3">
-        <input
-          type="text"
-          placeholder="Search crop (e.g., Wheat / गेहूं)"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="px-3 py-2 rounded-xl border bg-white/70 w-full focus:outline-none focus:ring-2 focus:ring-emerald-400"
-        />
-        <div className="flex justify-end">
-          <PrimaryButton onClick={() => setSearch("")}>Clear Search</PrimaryButton>
-        </div>
-      </Card>
+      {/* Inner tab switcher */}
+      <div className="flex bg-gray-100 rounded-xl p-1">
+        {INNER_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setInnerTab(tab.id)}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+              innerTab === tab.id
+                ? "bg-white text-emerald-700 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            <span>{tab.icon}</span>
+            <span>{t?.[tab.labelKey] || tab.label}</span>
+          </button>
+        ))}
+      </div>
 
-      {Object.entries(ADVISORY_DATA).map(([season, crops]) => {
-        const filtered = filterCrop(crops);
-        if (!filtered.length) return null;
-        return (
-          <div key={season}>
-            <h3 className="text-xl font-semibold text-emerald-700 mb-2">
-              🌾 {season} Season Crops
-            </h3>
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={{
-                hidden: { opacity: 0 },
-                visible: {
-                  opacity: 1,
-                  transition: { staggerChildren: 0.05 },
-                },
-              }}
-              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"
-            >
-              {filtered.map((item, idx) => (
-                <motion.div
-                  key={idx}
-                  variants={{
-                    hidden: { opacity: 0, y: 10 },
-                    visible: { opacity: 1, y: 0 },
-                  }}
-                >
-                  <Card>
-                    <h4 className="font-semibold text-lg text-brand-dark mb-2">
-                      {item.crop}
-                    </h4>
-                    <p className="text-sm text-gray-700 leading-snug">
-                      <span className="font-medium text-emerald-700">English:</span> {item.en}
-                    </p>
-                    <p className="text-sm text-gray-700 leading-snug mt-1">
-                      <span className="font-medium text-emerald-700">हिन्दी:</span> {item.hi}
-                    </p>
-                  </Card>
-                </motion.div>
-              ))}
-            </motion.div>
-          </div>
-        );
-      })}
+      {/* Tab content */}
+      <AnimatePresence mode="wait">
+
+        {/* ── Advisory Tips ─────────────────────────────────── */}
+        {innerTab === "tips" && (
+          <motion.div
+            key="tips"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
+            className="space-y-5"
+          >
+            <Card delay={0.1} className="space-y-3">
+              <input
+                type="text"
+                placeholder="Search crop (e.g., Wheat / गेहूं)"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="px-3 py-2 rounded-xl border bg-white/70 w-full focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              />
+              {search && (
+                <div className="flex justify-end">
+                  <PrimaryButton onClick={() => setSearch("")}>Clear</PrimaryButton>
+                </div>
+              )}
+            </Card>
+
+            {Object.entries(ADVISORY_DATA).map(([season, crops]) => {
+              const filtered = filterCrop(crops);
+              if (!filtered.length) return null;
+              return (
+                <div key={season}>
+                  <h3 className="text-lg font-bold text-emerald-700 mb-2 px-1">
+                    🌾 {season} Season
+                  </h3>
+                  <motion.div
+                    initial="hidden"
+                    animate="visible"
+                    variants={{
+                      hidden: { opacity: 0 },
+                      visible: { opacity: 1, transition: { staggerChildren: 0.05 } },
+                    }}
+                    className="grid sm:grid-cols-2 gap-3"
+                  >
+                    {filtered.map((item, idx) => (
+                      <motion.div
+                        key={idx}
+                        variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
+                      >
+                        <Card>
+                          <h4 className="font-semibold text-base text-gray-900 mb-2">{item.crop}</h4>
+                          <p className="text-sm text-gray-700 leading-snug">
+                            <span className="font-medium text-emerald-700">EN: </span>{item.en}
+                          </p>
+                          <p className="text-sm text-gray-700 leading-snug mt-1">
+                            <span className="font-medium text-emerald-700">हि: </span>{item.hi}
+                          </p>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                </div>
+              );
+            })}
+          </motion.div>
+        )}
+
+        {/* ── Crop Recommendation ───────────────────────────── */}
+        {innerTab === "recommend" && (
+          <motion.div
+            key="recommend"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
+          >
+            <CropRecommendation t={t} />
+          </motion.div>
+        )}
+
+      </AnimatePresence>
     </div>
   );
 }

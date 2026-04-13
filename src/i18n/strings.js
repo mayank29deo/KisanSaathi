@@ -69,6 +69,8 @@ const STRINGS = {
       "This is early guidance. Confirm with your local KVK or agriculture officer.",
 
     // Advisory
+    advisoryTips: "Advisory Tips",
+    advisorySubtitle: "Season-wise crop tips & AI-powered crop recommendation.",
     cropRotation: "Crop Rotation Tips",
     fertilizerGuide: "Fertilizer Guide",
     pestControl: "Pest & Disease Control",
@@ -200,6 +202,8 @@ const STRINGS = {
       "यह केवल प्रारंभिक सलाह है। कृपया नजदीकी कृषि विशेषज्ञ से पुष्टि करें।",
 
     // Advisory
+    advisoryTips: "सलाह सूची",
+    advisorySubtitle: "मौसम-आधारित फसल सुझाव और AI फसल अनुशंसा।",
     cropRotation: "फसल चक्र सुझाव",
     fertilizerGuide: "उर्वरक मार्गदर्शन",
     pestControl: "कीट एवं रोग नियंत्रण",
@@ -330,6 +334,8 @@ const STRINGS = {
       "এটি প্রাথমিক নির্দেশনা মাত্র। অনুগ্রহ করে নিকটবর্তী কৃষি বিশেষজ্ঞের সাথে নিশ্চিত করুন।",
 
     // Advisory
+    advisoryTips: "পরামর্শ তালিকা",
+    advisorySubtitle: "মৌসুম-ভিত্তিক ফসল পরামর্শ ও AI ফসল সুপারিশ।",
     cropRotation: "ফসল চক্রের পরামর্শ",
     fertilizerGuide: "সার ব্যবহারের নির্দেশিকা",
     pestControl: "কীট ও রোগ নিয়ন্ত্রণ",
