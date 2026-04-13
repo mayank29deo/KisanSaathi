@@ -92,6 +92,36 @@ export default function QuickLoan({ t, lang = "en" }) {
         </div>
       </div>
 
+      {/* Pre-approved banner */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 p-4 shadow-md"
+      >
+        {/* Shimmer effect */}
+        <motion.div
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-12"
+          animate={{ x: ["-200%", "200%"] }}
+          transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut", repeatDelay: 1 }}
+        />
+        <div className="relative flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center text-2xl shadow-sm flex-shrink-0">
+            💰
+          </div>
+          <div>
+            <p className="text-xs font-bold text-amber-900 uppercase tracking-wider">
+              {t?.loanPreApproved || "Pre-Approved Farm Support"}
+            </p>
+            <p className="text-2xl font-black text-white drop-shadow-sm">
+              {t?.loanUptoAmount || "Upto ₹1,00,000"}
+            </p>
+            <p className="text-xs text-amber-800 font-medium mt-0.5">
+              {t?.loanZeroCollateral || "Zero collateral · Instant disbursal · Low interest"}
+            </p>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Progress steps */}
       <div className="flex items-center gap-0 px-2">
         {["Upload Docs", "Verification", "Approved"].map((label, i) => {
