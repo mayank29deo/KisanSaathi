@@ -108,8 +108,10 @@ const STRINGS = {
     // CropRecommendation
     crop_title: "Crop",
     state: "State",
+    district: "District",
     season: "Season",
     select_state: "Select State",
+    select_district: "Select District",
     select_season: "Select Season",
     kharif: "Kharif",
     rabi: "Rabi",
@@ -120,11 +122,12 @@ const STRINGS = {
     ph: "Soil pH",
     rainfall: "Rainfall (mm)",
     soil_moisture: "Soil Moisture",
-    min_temp: "Minimum Temperature",
-    max_temp: "Maximum Temperature",
+    min_temp: "Min Temp",
+    max_temp: "Max Temp",
     predict: "Recommend Crop",
-    predicting: "Predicting...",
-    result: "Recommended Crop"
+    predicting: "Getting recommendation…",
+    result: "Recommended Crop",
+    cropSubtitle: "Select your location & season — soil data is filled automatically.",
   },
 
   hi: {
@@ -236,8 +239,10 @@ const STRINGS = {
     // CropRecommendation
     crop_title: "फसल सुझाव",
     state: "राज्य",
+    district: "जिला",
     season: "मौसम",
     select_state: "राज्य चुनें",
+    select_district: "जिला चुनें",
     select_season: "मौसम चुनें",
     kharif: "खरीफ",
     rabi: "रबी",
@@ -251,8 +256,9 @@ const STRINGS = {
     min_temp: "न्यूनतम तापमान",
     max_temp: "अधिकतम तापमान",
     predict: "फसल सुझाएँ",
-    predicting: "भविष्यवाणी हो रही है...",
-    result: "अनुशंसित फसल"
+    predicting: "सुझाव मिल रहा है…",
+    result: "अनुशंसित फसल",
+    cropSubtitle: "अपना स्थान और मौसम चुनें — मिट्टी की जानकारी अपने आप भर जाएगी।",
   },
     bn: {
     // App & Navigation
@@ -333,6 +339,30 @@ const STRINGS = {
     // Mandi
     mandiUpdates: "সর্বশেষ মান্ডি আপডেট",
     mandiUnavailable: "এই মুহূর্তে মান্ডির তথ্য উপলব্ধ নয়।",
+
+    // CropRecommendation
+    crop_title: "ফসল পরামর্শ",
+    state: "রাজ্য",
+    district: "জেলা",
+    season: "মৌসুম",
+    select_state: "রাজ্য বেছে নিন",
+    select_district: "জেলা বেছে নিন",
+    select_season: "মৌসুম বেছে নিন",
+    kharif: "খারিফ",
+    rabi: "রবি",
+    zaid: "জায়েদ",
+    nitrogen: "নাইট্রোজেন (N)",
+    phosphorus: "ফসফরাস (P)",
+    potassium: "পটাশিয়াম (K)",
+    ph: "মাটির pH",
+    rainfall: "বৃষ্টিপাত (মিমি)",
+    soil_moisture: "মাটির আর্দ্রতা",
+    min_temp: "সর্বনিম্ন তাপমাত্রা",
+    max_temp: "সর্বোচ্চ তাপমাত্রা",
+    predict: "ফসল পরামর্শ নিন",
+    predicting: "পরামর্শ নেওয়া হচ্ছে…",
+    result: "প্রস্তাবিত ফসল",
+    cropSubtitle: "আপনার স্থান ও মৌসুম বেছে নিন — মাটির তথ্য স্বয়ংক্রিয়ভাবে পূরণ হবে।",
 
     // Account / Auth
     register: "নিবন্ধন করুন",
