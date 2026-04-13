@@ -129,6 +129,12 @@ const STRINGS = {
     // Mandi
     mandiUpdates: "Latest Mandi Updates",
     mandiUnavailable: "Mandi data not available right now.",
+    mandiSubtitle: "Today's indicative wholesale prices (₹/quintal)",
+    mandiSearch: "Search crop or market…",
+    mandiAllStates: "All States",
+    mandiAllCrops: "All Crops",
+    mandiResults: "results",
+    mandiDisclaimer: "Indicative prices based on historical market data with seasonal adjustments. Confirm rates at your local mandi before selling.",
 
     // Account / Auth
     register: "Register",
@@ -313,6 +319,12 @@ const STRINGS = {
     // Mandi
     mandiUpdates: "नवीनतम मंडी भाव",
     mandiUnavailable: "मंडी डेटा अभी उपलब्ध नहीं है।",
+    mandiSubtitle: "आज के अनुमानित थोक भाव (₹/क्विंटल)",
+    mandiSearch: "फसल या मंडी खोजें…",
+    mandiAllStates: "सभी राज्य",
+    mandiAllCrops: "सभी फसलें",
+    mandiResults: "परिणाम",
+    mandiDisclaimer: "ये अनुमानित भाव हैं जो ऐतिहासिक डेटा और मौसमी समायोजन पर आधारित हैं। बेचने से पहले अपनी स्थानीय मंडी में दरें पुष्टि करें।",
 
     // Account / Auth
     register: "पंजीकरण करें",
@@ -496,6 +508,12 @@ const STRINGS = {
     // Mandi
     mandiUpdates: "সর্বশেষ মান্ডি আপডেট",
     mandiUnavailable: "এই মুহূর্তে মান্ডির তথ্য উপলব্ধ নয়।",
+    mandiSubtitle: "আজকের আনুমানিক পাইকারি দাম (₹/কুইন্টাল)",
+    mandiSearch: "ফসল বা মান্ডি খুঁজুন…",
+    mandiAllStates: "সব রাজ্য",
+    mandiAllCrops: "সব ফসল",
+    mandiResults: "ফলাফল",
+    mandiDisclaimer: "এগুলো ঐতিহাসিক তথ্য ও মৌসুমী সমন্বয়ের ভিত্তিতে আনুমানিক দাম। বিক্রির আগে আপনার স্থানীয় মান্ডিতে দর নিশ্চিত করুন।",
 
     // CropRecommendation
     crop_title: "ফসল পরামর্শ",
