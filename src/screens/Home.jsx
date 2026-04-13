@@ -7,7 +7,7 @@ import { fetchOSMHealth, haversineKm, deriveType } from "../utils/osm";
 
 const mockWeather = { temp: 32, summary: "Sunny", wind: 9, rainChance: 10 };
 
-export default function Home({ t, setTab }) {
+export default function Home({ t, setTab, user }) {
   const [live, setLive] = useState(null);
   const [wloading, setWloading] = useState(false);
   const [werror, setWerror] = useState(null);
@@ -103,13 +103,16 @@ export default function Home({ t, setTab }) {
   // --- UI RENDER (ENHANCED) ---
   return (
     <div className="space-y-6 pb-24">
-      {/* Header with improved spacing */}
+      {/* Personalized greeting */}
       <div className="pt-2 px-1">
-        <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
-          {t.home || "Home"}
+        <p className="text-sm text-emerald-600 font-medium">
+          {t.welcomeBack || "Welcome back"}, 👋
+        </p>
+        <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight mt-0.5">
+          {user?.name?.split(" ")[0] || t.home}
         </h1>
         <p className="text-gray-500 text-sm mt-1">
-          Welcome back. Here is your summary.
+          {t.weatherToday || "Here is your daily summary."}
         </p>
       </div>
 
