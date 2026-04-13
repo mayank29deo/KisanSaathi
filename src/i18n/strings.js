@@ -12,6 +12,23 @@ const STRINGS = {
     account: "Account",
     settings: "Settings",
 
+    // Voice Assistant
+    voiceTitle: "Ask Kisan Saathi",
+    voiceHint: "Tap the mic, ask in Hindi, Bengali or English — get instant farm advice.",
+    voiceListening: "Listening… tap to stop",
+    voiceThinking: "Thinking…",
+    voiceTap: "Tap to speak",
+    voiceYouSaid: "You said:",
+    voiceAskAgain: "Ask AI →",
+    voiceClear: "Clear",
+    voiceAnswer: "Kisan Saathi says",
+    voiceReadAloud: "Listen",
+    voiceNextStep: "Do this today",
+    voiceRelated: "Ask about",
+    voiceNoSpeech: "No speech detected. Tap the mic and speak.",
+    voiceError: "Could not capture voice. Please try again.",
+    voiceNotSupported: "Voice input not supported on this browser. Please use Google Chrome.",
+
     // Home screen
     welcome: "Welcome to Kisan Saathi",
     weatherToday: "Today's Weather",
@@ -147,6 +164,23 @@ const STRINGS = {
     account: "खाता",
     settings: "सेटिंग्स",
 
+    // Voice Assistant
+    voiceTitle: "किसान साथी से पूछें",
+    voiceHint: "माइक दबाएँ, हिंदी या अंग्रेज़ी में पूछें — तुरंत जवाब पाएँ।",
+    voiceListening: "सुन रहे हैं… रोकने के लिए दबाएँ",
+    voiceThinking: "सोच रहे हैं…",
+    voiceTap: "बोलने के लिए दबाएँ",
+    voiceYouSaid: "आपने कहा:",
+    voiceAskAgain: "AI से पूछें →",
+    voiceClear: "साफ़ करें",
+    voiceAnswer: "किसान साथी कहता है",
+    voiceReadAloud: "सुनें",
+    voiceNextStep: "आज यह करें",
+    voiceRelated: "और पूछें",
+    voiceNoSpeech: "कोई आवाज़ नहीं मिली। माइक दबाएँ और बोलें।",
+    voiceError: "आवाज़ पकड़ नहीं पाए। कृपया फिर कोशिश करें।",
+    voiceNotSupported: "इस ब्राउज़र में आवाज़ इनपुट उपलब्ध नहीं है। कृपया Google Chrome का उपयोग करें।",
+
     // Home screen
     welcome: "किसान साथी में आपका स्वागत है",
     weatherToday: "आज का मौसम",
@@ -280,6 +314,23 @@ const STRINGS = {
     sell: "বিক্রি",
     account: "অ্যাকাউন্ট",
     settings: "সেটিংস",
+
+    // Voice Assistant
+    voiceTitle: "কিষাণ সাথীকে জিজ্ঞাসা করুন",
+    voiceHint: "মাইক ট্যাপ করুন, বাংলা বা ইংরেজিতে জিজ্ঞাসা করুন — তাৎক্ষণিক উত্তর পান।",
+    voiceListening: "শুনছি… থামাতে ট্যাপ করুন",
+    voiceThinking: "ভাবছি…",
+    voiceTap: "বলতে ট্যাপ করুন",
+    voiceYouSaid: "আপনি বলেছেন:",
+    voiceAskAgain: "AI-কে জিজ্ঞাসা করুন →",
+    voiceClear: "মুছুন",
+    voiceAnswer: "কিষাণ সাথী বলছে",
+    voiceReadAloud: "শুনুন",
+    voiceNextStep: "আজ এটি করুন",
+    voiceRelated: "আরও জিজ্ঞাসা করুন",
+    voiceNoSpeech: "কোনো কথা শনাক্ত হয়নি। মাইক ট্যাপ করে বলুন।",
+    voiceError: "ভয়েস ক্যাপচার করা যায়নি। আবার চেষ্টা করুন।",
+    voiceNotSupported: "এই ব্রাউজারে ভয়েস ইনপুট সমর্থিত নয়। Google Chrome ব্যবহার করুন।",
 
     // Home screen
     welcome: "কিষাণ সাথীতে আপনাকে স্বাগতম",

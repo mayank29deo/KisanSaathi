@@ -44,7 +44,7 @@ export default function App() {
     if (user) updateUser({ lang: newLang });
   }
 
-  const t = STRINGS[lang] || STRINGS.en;
+  const t = { ...(STRINGS[lang] || STRINGS.en), _lang: lang };
 
   // Auth gate
   if (!user) {
