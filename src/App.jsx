@@ -19,7 +19,7 @@ import TabButton from "./components/TabButton";
 const LANG_KEY = "ks_lang";
 
 export default function App() {
-  const { user, register, login, updateUser, logout } = useAuth();
+  const { user, register, login, signInWithGoogle, updateUser, logout } = useAuth();
 
   // Persist language: prefer user profile lang, else localStorage, else "en"
   const [lang, setLang] = useState(() => {
@@ -55,6 +55,7 @@ export default function App() {
           if (mode === "register") return register(data);
           return login(data.phone);
         }}
+        onGoogleSignIn={signInWithGoogle}
       />
     );
   }
@@ -90,9 +91,13 @@ export default function App() {
           {/* User Avatar */}
           <button
             onClick={() => setShowProfile(true)}
-            className="w-9 h-9 rounded-full bg-emerald-600 text-white text-sm font-bold flex items-center justify-center shadow-sm active:scale-95 transition-transform"
+            className="w-9 h-9 rounded-full bg-emerald-600 text-white text-sm font-bold flex items-center justify-center shadow-sm active:scale-95 transition-transform overflow-hidden"
           >
-            {initials}
+            {user.photoURL ? (
+              <img src={user.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              initials
+            )}
           </button>
         </div>
       </div>
