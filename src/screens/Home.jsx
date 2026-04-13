@@ -7,9 +7,23 @@ import MapPreview from "../components/MapPreview";
 import { fetchOSMHealth, haversineKm, deriveType } from "../utils/osm";
 
 const mockWeather = { temp: 32, summary: "Sunny", wind: 9, rainChance: 10 };
+const WEATHER_CACHE_KEY = "ks_weather";
+const WEATHER_TTL = 30 * 60 * 1000; // 30 minutes
+
+function getCachedWeather() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY));
+    if (raw && Date.now() - raw._ts < WEATHER_TTL) return raw.data;
+  } catch {}
+  return null;
+}
+
+function setCachedWeather(data) {
+  localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ data, _ts: Date.now() }));
+}
 
 export default function Home({ t, setTab, user }) {
-  const [live, setLive] = useState(null);
+  const [live, setLive] = useState(() => getCachedWeather());
   const [wloading, setWloading] = useState(false);
   const [werror, setWerror] = useState(null);
 
@@ -19,7 +33,11 @@ export default function Home({ t, setTab, user }) {
   const [hError, setHError] = useState(null);
   const hRadius = 7;
 
-  // --- LOGIC (UNTOUCHED) ---
+  // Auto-fetch weather on first mount if no cache
+  useEffect(() => {
+    if (!live) getWeather();
+  }, []);
+
   async function getWeather() {
     try {
       setWerror(null);
@@ -32,6 +50,7 @@ export default function Home({ t, setTab, user }) {
               pos.coords.longitude
             );
             setLive(data);
+            setCachedWeather(data);
           } catch {
             setWerror("weather");
           } finally {
