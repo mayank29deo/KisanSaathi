@@ -145,7 +145,7 @@ const ADVISORY_DATA = {
 
 const INNER_TABS = [
   { id: "tips",   label: "Advisory Tips",      labelKey: "advisoryTips",   icon: "🌱" },
-  { id: "recommend", label: "Recommend Crop",  labelKey: "crop_title",     icon: "🌾" },
+  { id: "recommend", label: "Crop Recommendation", labelKey: "crop_title", icon: "🌾" },
 ];
 
 export default function Advisory({ t }) {

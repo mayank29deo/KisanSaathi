@@ -108,7 +108,7 @@ const STRINGS = {
     memberSince: "Member since",
 
     // CropRecommendation
-    crop_title: "Crop",
+    crop_title: "Crop Recommendation",
     state: "State",
     district: "District",
     season: "Season",
