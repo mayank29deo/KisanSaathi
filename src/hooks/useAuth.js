@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "../config/firebase";
+import { auth, googleProvider, isConfigured } from "../config/firebase";
 
 const STORAGE_KEY = "ks_users";
 const SESSION_KEY = "ks_session";
@@ -71,6 +71,9 @@ export function useAuth() {
 
   // Google Sign-In via Firebase popup
   const signInWithGoogle = useCallback(async () => {
+    if (!isConfigured || !auth) {
+      return { ok: false, error: "Firebase not configured" };
+    }
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const gUser  = result.user;
