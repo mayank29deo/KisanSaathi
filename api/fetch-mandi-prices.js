@@ -1,126 +1,28 @@
 /**
  * Vercel Serverless Function: GET /api/fetch-mandi-prices
  *
- * Scrapes daily commodity prices from Agmarknet (agmarknet.gov.in).
- * Two-step process: GET page → extract ASP.NET ViewState → POST search → parse HTML table.
+ * Fetches daily commodity prices from data.gov.in open API
+ * (Ministry of Agriculture — daily mandi price dataset).
  *
  * Query params:
- *   ?commodity=Wheat&state=Punjab  (optional filters)
+ *   ?state=Punjab          (optional state filter)
+ *   ?commodity=Wheat       (optional commodity filter)
+ *   ?limit=100             (optional, default 200)
  *
  * Returns JSON array of price records.
- * Caches results for 6 hours via Cache-Control headers.
- *
- * Falls back gracefully — frontend has a local price engine as backup.
+ * Uses data.gov.in's free sample API key (1000 req/day).
  */
 
-const cheerio = require("cheerio");
+// data.gov.in provides a sample API key for testing — works for moderate traffic.
+// For production, register at data.gov.in and get your own key, then set DATA_GOV_API_KEY env var.
+const DEFAULT_API_KEY = "579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b";
 
-const BASE_URL = "https://agmarknet.gov.in";
-const SEARCH_URL = `${BASE_URL}/SearchCmmMkt.aspx`;
+const RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070";
+const BASE_URL = `https://api.data.gov.in/resource/${RESOURCE_ID}`;
 
-// Common commodities to fetch if no specific commodity is requested
-const DEFAULT_COMMODITIES = [
-  "Wheat", "Paddy(Dhan)(Common)", "Maize", "Cotton", "Soyabean",
-  "Mustard", "Gram Dal(Chana Dal)", "Arhar (Tur/Red Gram)(Whole)",
-  "Moong(Green Gram)(Whole)", "Urad (Whole)", "Masoor Dal",
-  "Groundnut", "Bajra(Pearl Millet/Cumbu)", "Jowar(Sorghum)",
-  "Potato", "Onion", "Tomato", "Banana", "Turmeric", "Coconut",
-];
-
-const HEADERS = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-  "Accept-Language": "en-US,en;q=0.5",
-  "Content-Type": "application/x-www-form-urlencoded",
-};
-
-/**
- * Step 1: Fetch the search page and extract ASP.NET tokens + dropdown values
- */
-async function getPageTokens() {
-  const res = await fetch(SEARCH_URL, { headers: HEADERS, redirect: "follow" });
-  if (!res.ok) throw new Error(`Agmarknet page fetch failed: ${res.status}`);
-  const html = await res.text();
-  const $ = cheerio.load(html);
-
-  return {
-    viewState:          $('input[name="__VIEWSTATE"]').val() || "",
-    viewStateGenerator: $('input[name="__VIEWSTATEGENERATOR"]').val() || "",
-    eventValidation:    $('input[name="__EVENTVALIDATION"]').val() || "",
-    cookies:            res.headers.get("set-cookie") || "",
-  };
-}
-
-/**
- * Step 2: POST search query and parse the results table
- */
-async function searchPrices(tokens, commodity, state) {
-  const today = new Date();
-  const dateStr = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
-
-  const formData = new URLSearchParams({
-    "__VIEWSTATE": tokens.viewState,
-    "__VIEWSTATEGENERATOR": tokens.viewStateGenerator,
-    "__EVENTVALIDATION": tokens.eventValidation,
-    "ctl00$cph_InnerContainerRight$txt_FrmDt": dateStr,
-    "ctl00$cph_InnerContainerRight$txt_ToDt": dateStr,
-    "ctl00$cph_InnerContainerRight$ddl_Commodity": commodity || "",
-    "ctl00$cph_InnerContainerRight$ddl_State": state || "--Select--",
-    "ctl00$cph_InnerContainerRight$btn_Search": "Search",
-  });
-
-  const cookieHeader = tokens.cookies.split(",").map((c) => c.split(";")[0].trim()).join("; ");
-
-  const res = await fetch(SEARCH_URL, {
-    method: "POST",
-    headers: { ...HEADERS, Cookie: cookieHeader },
-    body: formData.toString(),
-    redirect: "follow",
-  });
-
-  if (!res.ok) throw new Error(`Agmarknet search failed: ${res.status}`);
-  return res.text();
-}
-
-/**
- * Parse the HTML results table into structured records
- */
-function parseResults(html) {
-  const $ = cheerio.load(html);
-  const records = [];
-
-  // Agmarknet uses a GridView table with ID containing "grd"
-  $("table[id*='grd'] tr, table.dGrid tr, #ctl00_cph_InnerContainerRight_grd_MktData tr").each((i, row) => {
-    if (i === 0) return; // skip header row
-    const cells = $(row).find("td");
-    if (cells.length < 6) return;
-
-    const getText = (idx) => $(cells[idx]).text().trim();
-
-    const record = {
-      state:     getText(0),
-      district:  getText(1),
-      market:    getText(2),
-      commodity: getText(3),
-      variety:   getText(4),
-      min:       parseInt(getText(5), 10) || 0,
-      max:       parseInt(getText(6), 10) || 0,
-      modal:     parseInt(getText(7), 10) || 0,
-      date:      getText(8) || new Date().toISOString().slice(0, 10),
-    };
-
-    // Only include if we got meaningful price data
-    if (record.modal > 0 && record.commodity) {
-      records.push(record);
-    }
-  });
-
-  return records;
-}
-
-// In-memory cache (persists across warm function invocations)
+// In-memory cache for warm function instances
 let cache = { data: null, ts: 0 };
-const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+const CACHE_TTL = 3 * 60 * 60 * 1000; // 3 hours
 
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -129,72 +31,87 @@ module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "GET") return res.status(405).json({ error: "GET only" });
 
-  // Check cache first
-  if (cache.data && Date.now() - cache.ts < CACHE_TTL) {
+  const stateFilter     = req.query?.state || "";
+  const commodityFilter = req.query?.commodity || "";
+  const limit           = Math.min(parseInt(req.query?.limit) || 200, 500);
+
+  // Build cache key based on filters
+  const cacheKey = `${stateFilter}|${commodityFilter}|${limit}`;
+
+  // Check cache (only for default/no-filter queries)
+  if (!stateFilter && !commodityFilter && cache.data && Date.now() - cache.ts < CACHE_TTL) {
     res.setHeader("X-Cache", "HIT");
-    res.setHeader("Cache-Control", "public, s-maxage=3600");
-    return res.status(200).json({ ok: true, source: "agmarknet-cached", records: cache.data });
+    res.setHeader("Cache-Control", "public, s-maxage=1800");
+    return res.status(200).json({ ok: true, source: "data.gov.in-cached", records: cache.data, total: cache.total });
   }
 
   try {
-    // Step 1: Get page tokens
-    const tokens = await getPageTokens();
+    const apiKey = process.env.DATA_GOV_API_KEY || DEFAULT_API_KEY;
 
-    if (!tokens.viewState) {
-      throw new Error("Could not extract ASP.NET ViewState — page structure may have changed");
+    // Build query URL with filters
+    const params = new URLSearchParams({
+      "api-key": apiKey,
+      format: "json",
+      limit: String(limit),
+      offset: "0",
+    });
+
+    if (stateFilter) {
+      params.append("filters[state.keyword]", stateFilter);
+    }
+    if (commodityFilter) {
+      params.append("filters[commodity]", commodityFilter);
     }
 
-    // Step 2: Fetch prices for default commodities
-    const allRecords = [];
-    const commodity = req.query?.commodity || "";
-    const state = req.query?.state || "";
+    const url = `${BASE_URL}?${params.toString()}`;
+    const response = await fetch(url, {
+      headers: { Accept: "application/json" },
+    });
 
-    if (commodity) {
-      // Specific commodity requested
-      const html = await searchPrices(tokens, commodity, state);
-      allRecords.push(...parseResults(html));
-    } else {
-      // Fetch top commodities (limit to 5 parallel to avoid rate limiting)
-      const batches = [];
-      for (let i = 0; i < DEFAULT_COMMODITIES.length; i += 5) {
-        batches.push(DEFAULT_COMMODITIES.slice(i, i + 5));
-      }
-
-      for (const batch of batches) {
-        const results = await Promise.allSettled(
-          batch.map(async (comm) => {
-            // Re-fetch tokens for each request (ASP.NET may invalidate)
-            try {
-              const t = await getPageTokens();
-              const html = await searchPrices(t, comm, state);
-              return parseResults(html);
-            } catch {
-              return [];
-            }
-          })
-        );
-        for (const r of results) {
-          if (r.status === "fulfilled") allRecords.push(...r.value);
-        }
-      }
+    if (!response.ok) {
+      throw new Error(`data.gov.in returned ${response.status}`);
     }
 
-    if (allRecords.length > 0) {
-      // Cache successful results
-      cache = { data: allRecords, ts: Date.now() };
-      res.setHeader("Cache-Control", "public, s-maxage=3600");
-      return res.status(200).json({ ok: true, source: "agmarknet-live", records: allRecords });
+    const json = await response.json();
+
+    if (json.status !== "ok" || !json.records) {
+      throw new Error("Unexpected response format from data.gov.in");
     }
 
-    // No records found — return empty (frontend will use fallback)
-    return res.status(200).json({ ok: true, source: "agmarknet-empty", records: [] });
+    // Normalize records to a clean format
+    const records = json.records
+      .filter((r) => r.modal_price > 0)
+      .map((r) => ({
+        state:      r.state,
+        district:   r.district,
+        market:     r.market,
+        commodity:  r.commodity,
+        variety:    r.variety || "",
+        grade:      r.grade || "",
+        min:        r.min_price,
+        max:        r.max_price,
+        modal:      r.modal_price,
+        date:       r.arrival_date || "",
+      }));
+
+    // Cache default queries
+    if (!stateFilter && !commodityFilter) {
+      cache = { data: records, total: json.total, ts: Date.now() };
+    }
+
+    res.setHeader("Cache-Control", "public, s-maxage=1800");
+    return res.status(200).json({
+      ok: true,
+      source: "data.gov.in",
+      total: json.total,
+      records,
+    });
 
   } catch (err) {
-    console.error("Agmarknet scrape error:", err.message);
-    // Return error — frontend falls back to local engine
+    console.error("data.gov.in fetch error:", err.message);
     return res.status(200).json({
       ok: false,
-      source: "agmarknet-error",
+      source: "data.gov.in-error",
       error: err.message,
       records: [],
     });

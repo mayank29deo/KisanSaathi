@@ -17,26 +17,35 @@ function getCachedLive() {
   return null;
 }
 
-/** Normalize a scraped record to match our card format */
+/** Normalize a data.gov.in record to match our card format */
 function normalizeLiveRecord(r) {
-  // Try to match commodity to our known list for bilingual names
   const needle = (r.commodity || "").toLowerCase();
   const match = ALL_COMMODITIES.find((c) =>
-    needle.includes(c.id) || c.name.toLowerCase().includes(needle) || needle.includes(c.name.toLowerCase().split(" ")[0])
+    needle.includes(c.id) ||
+    c.name.toLowerCase().includes(needle) ||
+    needle.includes(c.name.toLowerCase().split(" ")[0]) ||
+    needle.includes(c.name.toLowerCase().split("(")[0].trim())
   );
+
+  // Determine trend from seasonal data if we have a match
+  const month = new Date().getMonth() + 1;
+  let trend = "stable", trendReason = "Prices expected to remain stable";
+
   return {
-    commodityId:  match?.id || needle.replace(/\s+/g, "_"),
+    commodityId:  match?.id || needle.replace(/[^a-z0-9]/g, "_"),
     commodity:    r.commodity,
     commodity_hi: match?.name_hi || r.commodity,
     commodity_bn: match?.name_bn || r.commodity,
     market:       r.market || "—",
     state:        r.state || "—",
+    district:     r.district || "",
+    variety:      r.variety || "",
     modal:        r.modal,
     min:          r.min || Math.round(r.modal * 0.9),
     max:          r.max || Math.round(r.modal * 1.1),
     change:       0,
-    trend:        "stable",
-    trendReason:  "Prices expected to remain stable",
+    trend,
+    trendReason,
     history:      [],
     date:         r.date || new Date().toISOString().slice(0, 10),
     isLive:       true,
@@ -96,27 +105,34 @@ export default function Mandi({ t }) {
     return localPrices;
   }, [liveData, localPrices]);
 
-  // Fetch live data from Agmarknet on mount (if cache expired)
+  // Fetch live data from data.gov.in on mount (if cache expired)
   useEffect(() => {
-    if (liveData && Date.now() - liveData._ts < LIVE_CACHE_TTL) return; // cache still valid
+    if (liveData && Date.now() - liveData._ts < LIVE_CACHE_TTL) return;
     let cancelled = false;
     setLiveLoading(true);
 
-    fetch("/api/fetch-mandi-prices")
+    fetch("/api/fetch-mandi-prices?limit=300")
       .then((r) => r.json())
       .then((json) => {
         if (cancelled) return;
         if (json.ok && json.records?.length > 0) {
-          const cached = { records: json.records, source: json.source, _ts: Date.now() };
+          const cached = { records: json.records, source: json.source, total: json.total, _ts: Date.now() };
           localStorage.setItem(LIVE_CACHE_KEY, JSON.stringify(cached));
           setLiveData(cached);
         }
       })
-      .catch(() => {}) // silent — fallback to local engine
+      .catch(() => {})
       .finally(() => { if (!cancelled) setLiveLoading(false); });
 
     return () => { cancelled = true; };
   }, []);
+
+  // Unique states from live data for filter dropdown
+  const liveStates = useMemo(() => {
+    if (source !== "live") return ALL_STATES;
+    const s = new Set(allPrices.map((p) => p.state));
+    return [...s].sort();
+  }, [allPrices, source]);
 
   // Default "highlights" — pick one entry per commodity from a different state each
   const highlights = useMemo(() => {
@@ -203,7 +219,10 @@ export default function Mandi({ t }) {
             ? (t?.mandiSubtitleLive || "Today's wholesale prices from Agmarknet (₹/quintal)")
             : (t?.mandiSubtitle || "Today's indicative wholesale prices (₹/quintal)")}
         </p>
-        <p className="text-xs text-gray-400 mt-0.5">{todayStr}</p>
+        <p className="text-xs text-gray-400 mt-0.5">
+          {todayStr}
+          {source === "live" && liveData?.total && ` · ${liveData.total.toLocaleString("en-IN")} records across India`}
+        </p>
       </div>
 
       {/* Filters */}
@@ -222,7 +241,7 @@ export default function Mandi({ t }) {
             className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"
           >
             <option value="">{t?.mandiAllStates || "All States"}</option>
-            {ALL_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+            {liveStates.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
           <select
             value={commodity}
