@@ -3,6 +3,7 @@
  *
  * Proxies Google Places API (New) Nearby Search via REST.
  * Runs server-side so the API key doesn't need browser restrictions.
+ * Tries v1 (New) first, falls back to legacy nearbySearch.
  *
  * Query params:
  *   ?lat=28.6139&lon=77.2090   (required)
@@ -29,79 +30,25 @@ export default async function handler(req, res) {
   const includedTypes = types.split(",").map((t) => t.trim()).filter(Boolean);
   const radiusMeters = Math.min(Number(radius) || 10000, 50000);
 
-  // DEBUG MODE: show raw API responses
-  const debug = req.query.debug === "1";
-
-  let v1Error = null;
-  let v1Raw = null;
-  let legacyRaw = null;
-  let legacyError = null;
-
   // Try the new Places API (v1) REST endpoint first
   try {
-    if (debug) {
-      const body = {
-        includedTypes,
-        maxResultCount: 5,
-        locationRestriction: {
-          circle: {
-            center: { latitude: Number(lat), longitude: Number(lon) },
-            radius: radiusMeters,
-          },
-        },
-      };
-      const resp = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "places.id,places.displayName,places.location,places.formattedAddress,places.rating,places.types",
-        },
-        body: JSON.stringify(body),
-      });
-      v1Raw = { status: resp.status, body: await resp.json() };
-    } else {
-      const result = await searchNewAPI(apiKey, lat, lon, radiusMeters, includedTypes);
-      if (result.length > 0) {
-        res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
-        return res.status(200).json({ places: result, source: "places_v1" });
-      }
+    const result = await searchNewAPI(apiKey, lat, lon, radiusMeters, includedTypes);
+    if (result.length > 0) {
+      res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
+      return res.status(200).json({ places: result, source: "places_v1" });
     }
-  } catch (err) {
-    v1Error = err.message;
+  } catch {
+    // Fall through to legacy
   }
 
   // Fallback: legacy Places API (nearbySearch via HTTP)
   try {
-    if (debug) {
-      const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lon}&radius=${radiusMeters}&type=${includedTypes[0]}&key=${apiKey}`;
-      const resp = await fetch(url);
-      legacyRaw = await resp.json();
-    } else {
-      const result = await searchLegacyAPI(apiKey, lat, lon, radiusMeters, includedTypes);
-      res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
-      return res.status(200).json({ places: result, source: "places_legacy" });
-    }
+    const result = await searchLegacyAPI(apiKey, lat, lon, radiusMeters, includedTypes);
+    res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
+    return res.status(200).json({ places: result, source: "places_legacy" });
   } catch (err) {
-    legacyError = err.message;
+    return res.status(502).json({ error: "Places API failed", detail: err.message });
   }
-
-  if (debug) {
-    return res.status(200).json({
-      keyPresent: !!apiKey,
-      keyPrefix: apiKey.substring(0, 10) + "...",
-      v1: v1Raw || { error: v1Error },
-      legacy: legacyRaw || { error: legacyError },
-    });
-  }
-
-  return res.status(502).json({
-    error: "Both Places APIs failed",
-    v1Error,
-    legacyError,
-    keyPresent: !!apiKey,
-    keyPrefix: apiKey.substring(0, 8) + "...",
-  });
 }
 
 // ─── New Places API v1 (REST) ───────────────────────────────────
