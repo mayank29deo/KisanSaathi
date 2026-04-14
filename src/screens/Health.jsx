@@ -3,7 +3,7 @@ import Card from "../components/Card";
 import PrimaryButton from "../components/PrimaryButton";
 import GoogleMapPreview from "../components/GoogleMapPreview";
 import { geocodePlace, fetchOSMHealth, matchGovernment, haversineKm, deriveType, saveCache, loadCache } from "../utils/osm";
-import { loadGoogleMaps, searchMultipleTypes, isGoogleMapsAvailable } from "../utils/googleMaps";
+import { searchMultipleTypes, isGoogleMapsAvailable } from "../utils/googleMaps";
 
 export default function Health({ t }) {
   const [place, setPlace] = useState("");
@@ -57,11 +57,7 @@ export default function Health({ t }) {
     // Try Google Places first
     if (isGoogleMapsAvailable() && gTypes.length > 0) {
       try {
-        const maps = await loadGoogleMaps();
-        // Create a hidden map for PlacesService (reuse if possible)
-        const tempDiv = document.createElement("div");
-        const tempMap = new maps.Map(tempDiv, { center: { lat: latlon.lat, lng: latlon.lon }, zoom: 13 });
-        let items = await searchMultipleTypes(tempMap, latlon, radius * 1000, gTypes);
+        let items = await searchMultipleTypes(null, latlon, radius * 1000, gTypes);
         items = items.filter(matchesServices);
         items = items.slice(0, 50);
         setResults(items);

@@ -5,7 +5,7 @@ import VoiceAssistant from "../components/VoiceAssistant";
 import { fetchWeather } from "../utils/weather";
 import GoogleMapPreview from "../components/GoogleMapPreview";
 import { fetchOSMHealth, haversineKm, deriveType } from "../utils/osm";
-import { loadGoogleMaps, searchMultipleTypes, isGoogleMapsAvailable } from "../utils/googleMaps";
+import { searchMultipleTypes, isGoogleMapsAvailable } from "../utils/googleMaps";
 
 const mockWeather = { temp: 32, summary: "Sunny", wind: 9, rainChance: 10 };
 const WEATHER_CACHE_KEY = "ks_weather";
@@ -82,10 +82,7 @@ export default function Home({ t, setTab, user }) {
           // Try Google Places first
           if (isGoogleMapsAvailable()) {
             try {
-              const maps = await loadGoogleMaps();
-              const tempDiv = document.createElement("div");
-              const tempMap = new maps.Map(tempDiv, { center: { lat, lng: lon }, zoom: 13 });
-              const items = await searchMultipleTypes(tempMap, { lat, lon }, hRadius * 1000, ["hospital", "doctor", "pharmacy"]);
+              const items = await searchMultipleTypes(null, { lat, lon }, hRadius * 1000, ["hospital", "doctor", "pharmacy"]);
               setHMarkers(items.slice(0, 20));
               setHLoading(false);
               return;

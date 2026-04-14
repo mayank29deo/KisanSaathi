@@ -1,7 +1,7 @@
 /**
- * Google Maps + Places API loader and search utilities.
- * Loads Maps JavaScript API with Places library.
- * Falls back gracefully — callers should catch errors.
+ * Google Maps + Places API (New) loader and search utilities.
+ * Uses the new google.maps.places.Place.searchNearby() API
+ * (replaces deprecated PlacesService).
  */
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY || "";
@@ -26,76 +26,85 @@ export function loadGoogleMaps() {
   return loadPromise;
 }
 
-/** Check if Google Maps is available */
+/** Check if Google Maps key is configured */
 export function isGoogleMapsAvailable() {
   return !!API_KEY;
 }
 
 /**
- * Nearby Places search using Google Places API.
- * @param {google.maps.Map} map — an initialized map instance (needed by PlacesService)
+ * Nearby search using the NEW Places API (google.maps.places.Place.searchNearby).
  * @param {{ lat: number, lon: number }} center
  * @param {number} radiusMeters
- * @param {string} type — Google place type: 'hospital', 'pharmacy', 'bank', 'atm', 'doctor', 'health'
- * @returns {Promise<Array>} — normalized results
+ * @param {string[]} includedTypes — e.g. ["hospital", "pharmacy", "bank"]
+ * @returns {Promise<Array>}
  */
-export function searchNearbyPlaces(map, center, radiusMeters, type) {
-  return new Promise((resolve, reject) => {
-    const service = new window.google.maps.places.PlacesService(map);
-    service.nearbySearch(
-      {
-        location: { lat: center.lat, lng: center.lon },
-        radius: radiusMeters,
-        type,
-      },
-      (results, status) => {
-        if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
-          const normalized = results.map((p) => ({
-            id:   p.place_id,
-            name: p.name,
-            lat:  p.geometry.location.lat(),
-            lon:  p.geometry.location.lng(),
-            type,
-            address: p.vicinity || "",
-            rating:  p.rating || null,
-            open:    p.opening_hours?.isOpen?.() ?? null,
-            tags:    {},
-            distKm:  haversine(center.lat, center.lon, p.geometry.location.lat(), p.geometry.location.lng()),
-            source:  "google",
-          }));
-          normalized.sort((a, b) => a.distKm - b.distKm);
-          resolve(normalized);
-        } else if (status === window.google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-          resolve([]);
-        } else {
-          reject(new Error(`Places API: ${status}`));
-        }
-      }
-    );
-  });
+export async function searchNearbyPlaces(center, radiusMeters, includedTypes) {
+  const maps = await loadGoogleMaps();
+  const { Place } = maps.places;
+
+  if (!Place?.searchNearby) {
+    throw new Error("Place.searchNearby not available — ensure Places API (New) is enabled");
+  }
+
+  const request = {
+    fields: ["displayName", "location", "formattedAddress", "rating", "types", "id"],
+    locationRestriction: {
+      center: { lat: center.lat, lng: center.lon },
+      radius: Math.min(radiusMeters, 50000), // max 50km
+    },
+    includedPrimaryTypes: includedTypes,
+    maxResultCount: 20,
+  };
+
+  const { places } = await Place.searchNearby(request);
+
+  if (!places || places.length === 0) return [];
+
+  return places.map((p) => {
+    const lat = p.location?.lat() ?? 0;
+    const lon = p.location?.lng() ?? 0;
+    // Derive type from the first matching included type
+    const pTypes = p.types || [];
+    const type = includedTypes.find((t) => pTypes.includes(t)) || includedTypes[0];
+
+    return {
+      id:      p.id || `g_${lat}_${lon}`,
+      name:    p.displayName || "Unknown",
+      lat,
+      lon,
+      type,
+      address: p.formattedAddress || "",
+      rating:  p.rating || null,
+      tags:    {},
+      distKm:  haversine(center.lat, center.lon, lat, lon),
+      source:  "google",
+    };
+  }).sort((a, b) => a.distKm - b.distKm);
 }
 
 /**
  * Search multiple place types and merge results.
  */
-export async function searchMultipleTypes(map, center, radiusMeters, types) {
-  const results = await Promise.allSettled(
-    types.map((t) => searchNearbyPlaces(map, center, radiusMeters, t))
-  );
-  const merged = [];
-  const seen = new Set();
-  for (const r of results) {
-    if (r.status === "fulfilled") {
-      for (const p of r.value) {
-        if (!seen.has(p.id)) {
-          seen.add(p.id);
-          merged.push(p);
+export async function searchMultipleTypes(_, center, radiusMeters, types) {
+  // The new API accepts multiple types in one call
+  try {
+    return await searchNearbyPlaces(center, radiusMeters, types);
+  } catch {
+    // If single call with multiple types fails, try one by one
+    const results = await Promise.allSettled(
+      types.map((t) => searchNearbyPlaces(center, radiusMeters, [t]))
+    );
+    const merged = [];
+    const seen = new Set();
+    for (const r of results) {
+      if (r.status === "fulfilled") {
+        for (const p of r.value) {
+          if (!seen.has(p.id)) { seen.add(p.id); merged.push(p); }
         }
       }
     }
+    return merged.sort((a, b) => a.distKm - b.distKm);
   }
-  merged.sort((a, b) => a.distKm - b.distKm);
-  return merged;
 }
 
 /** Haversine distance in km */

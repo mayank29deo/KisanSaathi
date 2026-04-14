@@ -4,7 +4,7 @@ import PrimaryButton from "../components/PrimaryButton";
 import GoogleMapPreview from "../components/GoogleMapPreview";
 import QuickLoan from "../components/QuickLoan";
 import { geocodePlace, fetchOSMBanks, haversineKm } from "../utils/osm";
-import { loadGoogleMaps, searchMultipleTypes, isGoogleMapsAvailable } from "../utils/googleMaps";
+import { searchMultipleTypes, isGoogleMapsAvailable } from "../utils/googleMaps";
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
 
 const INNER_TABS = [
@@ -119,10 +119,7 @@ function BanksATMsTab({ t }) {
     // Try Google Places first
     if (isGoogleMapsAvailable() && gTypes.length > 0) {
       try {
-        const maps = await loadGoogleMaps();
-        const tempDiv = document.createElement("div");
-        const tempMap = new maps.Map(tempDiv, { center: { lat: latlon.lat, lng: latlon.lon }, zoom: 13 });
-        const items = await searchMultipleTypes(tempMap, latlon, radius * 1000, gTypes);
+        const items = await searchMultipleTypes(null, latlon, radius * 1000, gTypes);
         setResults(items.slice(0, 50));
         setLoading(false);
         return;
