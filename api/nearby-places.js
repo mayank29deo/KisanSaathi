@@ -21,13 +21,16 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Missing lat, lon, or types" });
   }
 
-  const apiKey = process.env.VITE_GOOGLE_MAPS_KEY || process.env.GOOGLE_MAPS_KEY || "";
+  const apiKey = process.env.GOOGLE_MAPS_KEY || process.env.VITE_GOOGLE_MAPS_KEY || "";
   if (!apiKey) {
-    return res.status(500).json({ error: "Google Maps key not configured" });
+    return res.status(500).json({ error: "Google Maps key not configured. Set GOOGLE_MAPS_KEY in Vercel env." });
   }
 
   const includedTypes = types.split(",").map((t) => t.trim()).filter(Boolean);
   const radiusMeters = Math.min(Number(radius) || 10000, 50000);
+
+  let v1Error = null;
+  let legacyError = null;
 
   // Try the new Places API (v1) REST endpoint first
   try {
@@ -36,8 +39,8 @@ export default async function handler(req, res) {
       res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
       return res.status(200).json({ places: result, source: "places_v1" });
     }
-  } catch {
-    // Fall through to legacy
+  } catch (err) {
+    v1Error = err.message;
   }
 
   // Fallback: legacy Places API (nearbySearch via HTTP)
@@ -46,7 +49,14 @@ export default async function handler(req, res) {
     res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
     return res.status(200).json({ places: result, source: "places_legacy" });
   } catch (err) {
-    return res.status(502).json({ error: "Places API failed", detail: err.message });
+    legacyError = err.message;
+    return res.status(502).json({
+      error: "Both Places APIs failed",
+      v1Error,
+      legacyError,
+      keyPresent: !!apiKey,
+      keyPrefix: apiKey.substring(0, 8) + "...",
+    });
   }
 }
 
