@@ -84,7 +84,10 @@ async function searchNewAPI(apiKey, lat, lon, radiusMeters, includedTypes) {
     body: JSON.stringify(body),
   });
 
-  if (!resp.ok) throw new Error(`v1 API ${resp.status}`);
+  if (!resp.ok) {
+    const errBody = await resp.text();
+    throw new Error(`v1 API ${resp.status}: ${errBody.substring(0, 200)}`);
+  }
 
   const data = await resp.json();
   if (!data.places?.length) return [];
@@ -134,7 +137,10 @@ async function searchLegacySingle(apiKey, lat, lon, radiusMeters, type) {
   if (!resp.ok) throw new Error(`Legacy API ${resp.status}`);
 
   const data = await resp.json();
-  if (data.status !== "OK" || !data.results?.length) return [];
+  if (data.status !== "OK") {
+    throw new Error(`Legacy status: ${data.status} — ${data.error_message || "no detail"}`);
+  }
+  if (!data.results?.length) return [];
 
   return data.results.map((p) => {
     const plat = p.geometry?.location?.lat ?? 0;
