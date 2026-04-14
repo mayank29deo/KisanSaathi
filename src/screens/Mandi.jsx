@@ -111,7 +111,7 @@ export default function Mandi({ t }) {
     let cancelled = false;
     setLiveLoading(true);
 
-    fetch("/api/fetch-mandi-prices?limit=500")
+    fetch("/api/fetch-mandi-prices?limit=2000")
       .then((r) => r.json())
       .then((json) => {
         if (cancelled) return;
