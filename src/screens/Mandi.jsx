@@ -1,9 +1,47 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getMandiPrices, getMandiStates, getMandiCommodities } from "../data/mandiPrices";
 
 const ALL_STATES = getMandiStates();
 const ALL_COMMODITIES = getMandiCommodities();
+
+const LIVE_CACHE_KEY = "ks_mandi_live";
+const LIVE_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+
+/** Try loading cached live data from localStorage */
+function getCachedLive() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LIVE_CACHE_KEY));
+    if (raw && Date.now() - raw._ts < LIVE_CACHE_TTL && raw.records?.length > 0) return raw;
+  } catch {}
+  return null;
+}
+
+/** Normalize a scraped record to match our card format */
+function normalizeLiveRecord(r) {
+  // Try to match commodity to our known list for bilingual names
+  const needle = (r.commodity || "").toLowerCase();
+  const match = ALL_COMMODITIES.find((c) =>
+    needle.includes(c.id) || c.name.toLowerCase().includes(needle) || needle.includes(c.name.toLowerCase().split(" ")[0])
+  );
+  return {
+    commodityId:  match?.id || needle.replace(/\s+/g, "_"),
+    commodity:    r.commodity,
+    commodity_hi: match?.name_hi || r.commodity,
+    commodity_bn: match?.name_bn || r.commodity,
+    market:       r.market || "—",
+    state:        r.state || "—",
+    modal:        r.modal,
+    min:          r.min || Math.round(r.modal * 0.9),
+    max:          r.max || Math.round(r.modal * 1.1),
+    change:       0,
+    trend:        "stable",
+    trendReason:  "Prices expected to remain stable",
+    history:      [],
+    date:         r.date || new Date().toISOString().slice(0, 10),
+    isLive:       true,
+  };
+}
 
 const TREND_CONFIG = {
   up:          { icon: "📈", label: "Likely to rise",     labelHi: "बढ़ने की संभावना",   labelBn: "বাড়ার সম্ভাবনা",   color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
@@ -40,12 +78,45 @@ export default function Mandi({ t }) {
   const [search, setSearch]       = useState("");
   const [state, setState]         = useState("");
   const [commodity, setCommodity] = useState("");
+  const [liveData, setLiveData]   = useState(() => getCachedLive());
+  const [liveLoading, setLiveLoading] = useState(false);
 
   const lang = t?._lang || "en";
-  const allPrices = useMemo(() => getMandiPrices(), []);
-  const todayStr = allPrices[0]?.date || new Date().toISOString().slice(0, 10);
+  const localPrices = useMemo(() => getMandiPrices(), []);
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   const isFiltered = !!(search || state || commodity);
+
+  // Source: live data if available, else local engine
+  const source = liveData?.records?.length > 0 ? "live" : "local";
+  const allPrices = useMemo(() => {
+    if (liveData?.records?.length > 0) {
+      return liveData.records.map(normalizeLiveRecord);
+    }
+    return localPrices;
+  }, [liveData, localPrices]);
+
+  // Fetch live data from Agmarknet on mount (if cache expired)
+  useEffect(() => {
+    if (liveData && Date.now() - liveData._ts < LIVE_CACHE_TTL) return; // cache still valid
+    let cancelled = false;
+    setLiveLoading(true);
+
+    fetch("/api/fetch-mandi-prices")
+      .then((r) => r.json())
+      .then((json) => {
+        if (cancelled) return;
+        if (json.ok && json.records?.length > 0) {
+          const cached = { records: json.records, source: json.source, _ts: Date.now() };
+          localStorage.setItem(LIVE_CACHE_KEY, JSON.stringify(cached));
+          setLiveData(cached);
+        }
+      })
+      .catch(() => {}) // silent — fallback to local engine
+      .finally(() => { if (!cancelled) setLiveLoading(false); });
+
+    return () => { cancelled = true; };
+  }, []);
 
   // Default "highlights" — pick one entry per commodity from a different state each
   const highlights = useMemo(() => {
@@ -109,12 +180,28 @@ export default function Mandi({ t }) {
             📊 {t?.mandi || "Mandi Prices"}
           </h1>
           <div className="flex items-center gap-1.5">
-            <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-semibold text-emerald-600">LIVE</span>
+            {liveLoading ? (
+              <span className="flex items-center gap-1 text-xs text-blue-500 font-semibold">
+                <span className="w-2.5 h-2.5 border border-blue-400 border-t-transparent rounded-full animate-spin" />
+                Fetching…
+              </span>
+            ) : source === "live" ? (
+              <>
+                <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-semibold text-emerald-600">AGMARKNET LIVE</span>
+              </>
+            ) : (
+              <>
+                <span className="inline-flex h-2 w-2 rounded-full bg-amber-400" />
+                <span className="text-xs font-semibold text-amber-600">ESTIMATED</span>
+              </>
+            )}
           </div>
         </div>
         <p className="text-gray-500 text-sm mt-1">
-          {t?.mandiSubtitle || "Today's indicative wholesale prices (₹/quintal)"}
+          {source === "live"
+            ? (t?.mandiSubtitleLive || "Today's wholesale prices from Agmarknet (₹/quintal)")
+            : (t?.mandiSubtitle || "Today's indicative wholesale prices (₹/quintal)")}
         </p>
         <p className="text-xs text-gray-400 mt-0.5">{todayStr}</p>
       </div>
@@ -190,7 +277,10 @@ export default function Mandi({ t }) {
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-bold text-gray-900 text-base truncate">{cName(p)}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-gray-900 text-base truncate">{cName(p)}</h3>
+                          {p.isLive && <span className="text-xs bg-emerald-100 text-emerald-600 font-bold px-1.5 py-0.5 rounded flex-shrink-0">LIVE</span>}
+                        </div>
                         <p className="text-xs text-gray-500 mt-0.5">📍 {p.market}, {p.state}</p>
                       </div>
                       <div className="text-right flex-shrink-0">
