@@ -111,7 +111,7 @@ export default function Mandi({ t }) {
     let cancelled = false;
     setLiveLoading(true);
 
-    fetch("/api/fetch-mandi-prices?limit=300")
+    fetch("/api/fetch-mandi-prices?limit=500")
       .then((r) => r.json())
       .then((json) => {
         if (cancelled) return;
@@ -134,20 +134,52 @@ export default function Mandi({ t }) {
     return [...s].sort();
   }, [allPrices, source]);
 
-  // Default "highlights" — pick one entry per commodity from a different state each
-  const highlights = useMemo(() => {
-    const picked = [];
-    const usedStates = new Set();
-    for (const c of ALL_COMMODITIES) {
-      const entries = allPrices.filter((p) => p.commodityId === c.id);
-      // Pick from a state we haven't used yet, for variety
-      const entry = entries.find((e) => !usedStates.has(e.state)) || entries[0];
-      if (entry) {
-        picked.push(entry);
-        usedStates.add(entry.state);
-        if (usedStates.size >= ALL_STATES.length) usedStates.clear();
+  // Unique commodities from live data for filter dropdown
+  const liveCommodities = useMemo(() => {
+    if (source !== "live") {
+      return ALL_COMMODITIES.map((c) => ({
+        id: c.id,
+        label: lang === "hi" ? c.name_hi : lang === "bn" ? c.name_bn : c.name,
+      }));
+    }
+    const seen = new Map();
+    for (const p of allPrices) {
+      const key = p.commodityId;
+      if (!seen.has(key)) {
+        seen.set(key, {
+          id: key,
+          label: lang === "hi" ? p.commodity_hi : lang === "bn" ? p.commodity_bn : p.commodity,
+        });
       }
     }
+    return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label));
+  }, [allPrices, source, lang]);
+
+  // Default "highlights" — one entry per unique commodity, from different states
+  const highlights = useMemo(() => {
+    const picked = [];
+    const seenCommodities = new Set();
+    const usedStates = new Set();
+
+    // Sort by modal price descending so higher-value crops show first
+    const sorted = [...allPrices].sort((a, b) => b.modal - a.modal);
+
+    for (const p of sorted) {
+      const key = p.commodity.toLowerCase().trim();
+      if (seenCommodities.has(key)) continue;
+
+      // Prefer entries from states we haven't shown yet (variety)
+      const sameComm = sorted.filter((x) => x.commodity.toLowerCase().trim() === key);
+      const fromNewState = sameComm.find((x) => !usedStates.has(x.state));
+      const entry = fromNewState || sameComm[0];
+
+      seenCommodities.add(key);
+      picked.push(entry);
+      usedStates.add(entry.state);
+      if (usedStates.size >= 15) usedStates.clear(); // reset to keep variety going
+      if (picked.length >= 40) break; // cap at 40 highlights
+    }
+
     return picked;
   }, [allPrices]);
 
@@ -249,10 +281,8 @@ export default function Mandi({ t }) {
             className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"
           >
             <option value="">{t?.mandiAllCrops || "All Crops"}</option>
-            {ALL_COMMODITIES.map((c) => (
-              <option key={c.id} value={c.id}>
-                {lang === "hi" ? c.name_hi : lang === "bn" ? c.name_bn : c.name}
-              </option>
+            {liveCommodities.map((c) => (
+              <option key={c.id} value={c.id}>{c.label}</option>
             ))}
           </select>
         </div>
