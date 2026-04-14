@@ -5,18 +5,66 @@ import { getMandiPrices, getMandiStates, getMandiCommodities } from "../data/man
 const ALL_STATES = getMandiStates();
 const ALL_COMMODITIES = getMandiCommodities();
 
+const TREND_CONFIG = {
+  up:          { icon: "📈", label: "Likely to rise",     labelHi: "बढ़ने की संभावना",   labelBn: "বাড়ার সম্ভাবনা",   color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
+  slight_up:   { icon: "↗️", label: "May increase",       labelHi: "बढ़ सकता है",       labelBn: "বাড়তে পারে",       color: "text-green-600 bg-green-50 border-green-100" },
+  stable:      { icon: "➡️", label: "Stable",             labelHi: "स्थिर",             labelBn: "স্থিতিশীল",          color: "text-gray-500 bg-gray-50 border-gray-100" },
+  slight_down: { icon: "↘️", label: "May decrease",       labelHi: "घट सकता है",        labelBn: "কমতে পারে",         color: "text-orange-500 bg-orange-50 border-orange-100" },
+  down:        { icon: "📉", label: "Likely to fall",     labelHi: "गिरने की संभावना",   labelBn: "কমার সম্ভাবনা",    color: "text-red-500 bg-red-50 border-red-100" },
+};
+
+const TREND_REASONS = {
+  "Off-season / demand rise ahead":    { hi: "ऑफ-सीजन / आगे माँग बढ़ेगी",      bn: "অফ-সিজন / চাহিদা বাড়বে" },
+  "Gradual price increase expected":   { hi: "धीरे-धीरे दाम बढ़ने की उम्मीद",   bn: "ধীরে ধীরে দাম বাড়ার সম্ভাবনা" },
+  "Harvest season approaching":        { hi: "फसल कटाई का मौसम आ रहा है",       bn: "ফসল কাটার মৌসুম আসছে" },
+  "Supply increase expected":          { hi: "आपूर्ति बढ़ने की संभावना",          bn: "সরবরাহ বাড়ার সম্ভাবনা" },
+  "Prices expected to remain stable":  { hi: "दाम स्थिर रहने की उम्मीद",        bn: "দাম স্থিতিশীল থাকার সম্ভাবনা" },
+};
+
+/** Mini sparkline SVG from 7-day history */
+function Sparkline({ data, trend }) {
+  if (!data || data.length < 2) return null;
+  const h = 24, w = 60;
+  const mn = Math.min(...data), mx = Math.max(...data);
+  const range = mx - mn || 1;
+  const pts = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - mn) / range) * h}`).join(" ");
+  const strokeColor = trend === "up" || trend === "slight_up" ? "#10b981" : trend === "down" || trend === "slight_down" ? "#ef4444" : "#9ca3af";
+  return (
+    <svg width={w} height={h} className="flex-shrink-0">
+      <polyline fill="none" stroke={strokeColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" points={pts} />
+    </svg>
+  );
+}
+
 export default function Mandi({ t }) {
-  const [search, setSearch]   = useState("");
-  const [state, setState]     = useState("");
+  const [search, setSearch]       = useState("");
+  const [state, setState]         = useState("");
   const [commodity, setCommodity] = useState("");
 
   const lang = t?._lang || "en";
-
-  // Generate today's prices (memoized — only recalculates on date change)
   const allPrices = useMemo(() => getMandiPrices(), []);
   const todayStr = allPrices[0]?.date || new Date().toISOString().slice(0, 10);
 
-  // Filter
+  const isFiltered = !!(search || state || commodity);
+
+  // Default "highlights" — pick one entry per commodity from a different state each
+  const highlights = useMemo(() => {
+    const picked = [];
+    const usedStates = new Set();
+    for (const c of ALL_COMMODITIES) {
+      const entries = allPrices.filter((p) => p.commodityId === c.id);
+      // Pick from a state we haven't used yet, for variety
+      const entry = entries.find((e) => !usedStates.has(e.state)) || entries[0];
+      if (entry) {
+        picked.push(entry);
+        usedStates.add(entry.state);
+        if (usedStates.size >= ALL_STATES.length) usedStates.clear();
+      }
+    }
+    return picked;
+  }, [allPrices]);
+
+  // Filtered results when user applies filters
   const filtered = useMemo(() => {
     return allPrices.filter((p) => {
       const stateOk = !state || p.state === state;
@@ -30,11 +78,21 @@ export default function Mandi({ t }) {
     });
   }, [allPrices, state, commodity, search]);
 
-  // Commodity name in user language
+  const displayList = isFiltered ? filtered : highlights;
+
   const cName = (p) =>
-    lang === "hi" ? `${p.commodity_hi}` :
-    lang === "bn" ? `${p.commodity_bn}` :
-    p.commodity;
+    lang === "hi" ? p.commodity_hi : lang === "bn" ? p.commodity_bn : p.commodity;
+
+  const trendLabel = (trend) => {
+    const cfg = TREND_CONFIG[trend] || TREND_CONFIG.stable;
+    return lang === "hi" ? cfg.labelHi : lang === "bn" ? cfg.labelBn : cfg.label;
+  };
+
+  const trendReasonText = (reason) => {
+    const r = TREND_REASONS[reason];
+    if (!r) return reason;
+    return lang === "hi" ? r.hi : lang === "bn" ? r.bn : reason;
+  };
 
   return (
     <motion.div
@@ -70,7 +128,6 @@ export default function Mandi({ t }) {
           onChange={(e) => setSearch(e.target.value)}
           className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"
         />
-
         <div className="grid grid-cols-2 gap-2">
           <select
             value={state}
@@ -80,7 +137,6 @@ export default function Mandi({ t }) {
             <option value="">{t?.mandiAllStates || "All States"}</option>
             {ALL_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-
           <select
             value={commodity}
             onChange={(e) => setCommodity(e.target.value)}
@@ -94,8 +150,7 @@ export default function Mandi({ t }) {
             ))}
           </select>
         </div>
-
-        {(search || state || commodity) && (
+        {isFiltered && (
           <button
             onClick={() => { setSearch(""); setState(""); setCommodity(""); }}
             className="text-xs text-gray-500 font-semibold px-3 py-1 rounded-lg bg-gray-100 active:scale-95 transition-transform"
@@ -105,85 +160,79 @@ export default function Mandi({ t }) {
         )}
       </div>
 
-      {/* Results count */}
-      <p className="text-xs text-gray-400 px-1">
-        {filtered.length} {t?.mandiResults || "results"}
-        {state && ` · ${state}`}
-        {commodity && ` · ${ALL_COMMODITIES.find((c) => c.id === commodity)?.name || ""}`}
-      </p>
+      {/* Section label */}
+      <div className="px-1 flex items-center justify-between">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          {isFiltered
+            ? `${filtered.length} ${t?.mandiResults || "results"}`
+            : (t?.mandiHighlights || "Today's Market Highlights")}
+        </p>
+        {!isFiltered && (
+          <p className="text-xs text-gray-400">{highlights.length} {t?.mandiCrops || "crops"}</p>
+        )}
+      </div>
 
       {/* Price cards */}
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         <AnimatePresence>
-          {filtered.length > 0 ? (
-            filtered.slice(0, 50).map((p, i) => (
-              <motion.div
-                key={`${p.commodityId}-${p.market}-${p.state}`}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: Math.min(i * 0.02, 0.3) }}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  {/* Left: commodity + market info */}
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-gray-900 text-base truncate">{cName(p)}</h3>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      📍 {p.market}, {p.state}
-                    </p>
-                  </div>
+          {displayList.length > 0 ? (
+            displayList.slice(0, 60).map((p, i) => {
+              const tc = TREND_CONFIG[p.trend] || TREND_CONFIG.stable;
+              return (
+                <motion.div
+                  key={`${p.commodityId}-${p.market}-${p.state}`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(i * 0.02, 0.4) }}
+                  className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+                >
+                  {/* Main row */}
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-bold text-gray-900 text-base truncate">{cName(p)}</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">📍 {p.market}, {p.state}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xl font-extrabold text-gray-900">₹{p.modal.toLocaleString("en-IN")}</p>
+                        <div className={`flex items-center justify-end gap-1 mt-0.5 ${
+                          p.change > 0 ? "text-emerald-600" : p.change < 0 ? "text-red-500" : "text-gray-400"
+                        }`}>
+                          <span className="text-xs font-bold">
+                            {p.change > 0 ? "▲" : p.change < 0 ? "▼" : "—"} {Math.abs(p.change)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-                  {/* Right: price + change */}
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-xl font-extrabold text-gray-900">
-                      ₹{p.modal.toLocaleString("en-IN")}
-                    </p>
-                    <div className={`flex items-center justify-end gap-1 mt-0.5 ${
-                      p.change > 0 ? "text-emerald-600" : p.change < 0 ? "text-red-500" : "text-gray-400"
-                    }`}>
-                      <span className="text-xs font-bold">
-                        {p.change > 0 ? "▲" : p.change < 0 ? "▼" : "—"}
-                        {Math.abs(p.change)}%
-                      </span>
+                    {/* Min/Max bar */}
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className="text-xs text-gray-400 w-14 text-right">₹{p.min.toLocaleString("en-IN")}</span>
+                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden relative">
+                        <div className="absolute h-full bg-gradient-to-r from-amber-300 to-emerald-400 rounded-full" style={{ width: "100%" }} />
+                        <div className="absolute top-0 h-full w-0.5 bg-gray-800 rounded-full" style={{ left: `${((p.modal - p.min) / (p.max - p.min)) * 100}%` }} />
+                      </div>
+                      <span className="text-xs text-gray-400 w-14">₹{p.max.toLocaleString("en-IN")}</span>
                     </div>
                   </div>
-                </div>
 
-                {/* Min/Max bar */}
-                <div className="mt-3 flex items-center gap-2">
-                  <div className="text-xs text-gray-400 w-16 text-right">
-                    ₹{p.min.toLocaleString("en-IN")}
+                  {/* Trend + sparkline footer */}
+                  <div className={`px-4 py-2.5 border-t flex items-center justify-between gap-3 ${tc.color}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-sm">{tc.icon}</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold truncate">{trendLabel(p.trend)}</p>
+                        <p className="text-xs opacity-70 truncate">{trendReasonText(p.trendReason)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Sparkline data={p.history} trend={p.trend} />
+                      <span className="text-xs opacity-60">7d</span>
+                    </div>
                   </div>
-                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden relative">
-                    {/* Range fill */}
-                    <div
-                      className="absolute h-full bg-gradient-to-r from-amber-300 to-emerald-400 rounded-full"
-                      style={{
-                        left: "0%",
-                        width: "100%",
-                      }}
-                    />
-                    {/* Modal price marker */}
-                    <div
-                      className="absolute top-0 h-full w-0.5 bg-gray-800 rounded-full"
-                      style={{
-                        left: `${((p.modal - p.min) / (p.max - p.min)) * 100}%`,
-                      }}
-                    />
-                  </div>
-                  <div className="text-xs text-gray-400 w-16">
-                    ₹{p.max.toLocaleString("en-IN")}
-                  </div>
-                </div>
-                <div className="flex justify-between mt-1 text-xs text-gray-400">
-                  <span>Min</span>
-                  <span className="font-semibold text-gray-600">
-                    Modal: ₹{p.modal.toLocaleString("en-IN")}
-                  </span>
-                  <span>Max</span>
-                </div>
-              </motion.div>
-            ))
+                </motion.div>
+              );
+            })
           ) : (
             <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-400">
               <div className="text-3xl mb-2 opacity-40">🔍</div>

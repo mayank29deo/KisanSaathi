@@ -107,6 +107,42 @@ export function getMandiPrices(date = new Date()) {
         const yModal = Math.round(c.base * seasonMul * priceFactor * ydf);
         const change = ((modal - yModal) / yModal) * 100;
 
+        // Trend forecast: compare current month's seasonal multiplier with next 2 months
+        const nextMonth1 = (month % 12) + 1;
+        const nextMonth2 = (nextMonth1 % 12) + 1;
+        const curSeason  = c.season[month]  || 1.0;
+        const nm1Season  = c.season[nextMonth1] || 1.0;
+        const nm2Season  = c.season[nextMonth2] || 1.0;
+        const avgFuture  = (nm1Season + nm2Season) / 2;
+        const trendDiff  = avgFuture - curSeason;
+
+        let trend, trendReason;
+        if (trendDiff > 0.04) {
+          trend = "up";
+          trendReason = "Off-season / demand rise ahead";
+        } else if (trendDiff > 0.01) {
+          trend = "slight_up";
+          trendReason = "Gradual price increase expected";
+        } else if (trendDiff < -0.04) {
+          trend = "down";
+          trendReason = "Harvest season approaching";
+        } else if (trendDiff < -0.01) {
+          trend = "slight_down";
+          trendReason = "Supply increase expected";
+        } else {
+          trend = "stable";
+          trendReason = "Prices expected to remain stable";
+        }
+
+        // 7-day price history
+        const history = [];
+        for (let d = 6; d >= 0; d--) {
+          const past = new Date(date);
+          past.setDate(past.getDate() - d);
+          const pdf = dailyFactor(c.id, market, past);
+          history.push(Math.round(c.base * seasonMul * priceFactor * pdf));
+        }
+
         results.push({
           commodityId: c.id,
           commodity:   c.name,
@@ -118,6 +154,9 @@ export function getMandiPrices(date = new Date()) {
           min,
           max,
           change: parseFloat(change.toFixed(1)),
+          trend,
+          trendReason,
+          history,
           date: date.toISOString().slice(0, 10),
         });
       }

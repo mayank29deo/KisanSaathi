@@ -134,6 +134,8 @@ const STRINGS = {
     mandiAllStates: "All States",
     mandiAllCrops: "All Crops",
     mandiResults: "results",
+    mandiHighlights: "Today's Market Highlights",
+    mandiCrops: "crops",
     mandiDisclaimer: "Indicative prices based on historical market data with seasonal adjustments. Confirm rates at your local mandi before selling.",
 
     // Account / Auth
@@ -324,6 +326,8 @@ const STRINGS = {
     mandiAllStates: "सभी राज्य",
     mandiAllCrops: "सभी फसलें",
     mandiResults: "परिणाम",
+    mandiHighlights: "आज की मंडी हाइलाइट्स",
+    mandiCrops: "फसलें",
     mandiDisclaimer: "ये अनुमानित भाव हैं जो ऐतिहासिक डेटा और मौसमी समायोजन पर आधारित हैं। बेचने से पहले अपनी स्थानीय मंडी में दरें पुष्टि करें।",
 
     // Account / Auth
@@ -513,6 +517,8 @@ const STRINGS = {
     mandiAllStates: "সব রাজ্য",
     mandiAllCrops: "সব ফসল",
     mandiResults: "ফলাফল",
+    mandiHighlights: "আজকের মান্ডি হাইলাইটস",
+    mandiCrops: "ফসল",
     mandiDisclaimer: "এগুলো ঐতিহাসিক তথ্য ও মৌসুমী সমন্বয়ের ভিত্তিতে আনুমানিক দাম। বিক্রির আগে আপনার স্থানীয় মান্ডিতে দর নিশ্চিত করুন।",
 
     // CropRecommendation
