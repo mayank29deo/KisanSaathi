@@ -1,9 +1,10 @@
 import { useState, useRef } from "react";
 import Card from "../components/Card";
 import PrimaryButton from "../components/PrimaryButton";
-import MapPreview from "../components/MapPreview";
+import GoogleMapPreview from "../components/GoogleMapPreview";
 import QuickLoan from "../components/QuickLoan";
 import { geocodePlace, fetchOSMBanks, haversineKm } from "../utils/osm";
+import { loadGoogleMaps, searchMultipleTypes, isGoogleMapsAvailable } from "../utils/googleMaps";
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
 
 const INNER_TABS = [
@@ -108,8 +109,30 @@ function BanksATMsTab({ t }) {
 
   async function search() {
     if (!latlon) { setError("noloc"); return; }
+    setError(null); setLoading(true); setResults([]);
+
+    // Build Google Places type list
+    const gTypes = [];
+    if (types.bank) gTypes.push("bank");
+    if (types.atm) gTypes.push("atm");
+
+    // Try Google Places first
+    if (isGoogleMapsAvailable() && gTypes.length > 0) {
+      try {
+        const maps = await loadGoogleMaps();
+        const tempDiv = document.createElement("div");
+        const tempMap = new maps.Map(tempDiv, { center: { lat: latlon.lat, lng: latlon.lon }, zoom: 13 });
+        const items = await searchMultipleTypes(tempMap, latlon, radius * 1000, gTypes);
+        setResults(items.slice(0, 50));
+        setLoading(false);
+        return;
+      } catch {
+        // Fall through to Overpass
+      }
+    }
+
+    // Fallback: Overpass
     try {
-      setError(null); setLoading(true); setResults([]);
       const elems = await fetchOSMBanks(latlon.lat, latlon.lon, radius);
       let items = (elems || [])
         .map((e) => ({
@@ -163,7 +186,7 @@ function BanksATMsTab({ t }) {
       {latlon && (
         <Card>
           <div className="font-semibold mb-2">Map</div>
-          <MapPreview center={latlon} markers={results} radiusKm={radius} />
+          <GoogleMapPreview center={latlon} markers={results} radiusKm={radius} />
         </Card>
       )}
 

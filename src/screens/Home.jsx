@@ -3,8 +3,9 @@ import Card from "../components/Card";
 import PrimaryButton from "../components/PrimaryButton";
 import VoiceAssistant from "../components/VoiceAssistant";
 import { fetchWeather } from "../utils/weather";
-import MapPreview from "../components/MapPreview";
+import GoogleMapPreview from "../components/GoogleMapPreview";
 import { fetchOSMHealth, haversineKm, deriveType } from "../utils/osm";
+import { loadGoogleMaps, searchMultipleTypes, isGoogleMapsAvailable } from "../utils/googleMaps";
 
 const mockWeather = { temp: 32, summary: "Sunny", wind: 9, rainChance: 10 };
 const WEATHER_CACHE_KEY = "ks_weather";
@@ -77,6 +78,21 @@ export default function Home({ t, setTab, user }) {
           const lat = pos.coords.latitude,
             lon = pos.coords.longitude;
           setHLatlon({ lat, lon, label: "GPS" });
+
+          // Try Google Places first
+          if (isGoogleMapsAvailable()) {
+            try {
+              const maps = await loadGoogleMaps();
+              const tempDiv = document.createElement("div");
+              const tempMap = new maps.Map(tempDiv, { center: { lat, lng: lon }, zoom: 13 });
+              const items = await searchMultipleTypes(tempMap, { lat, lon }, hRadius * 1000, ["hospital", "doctor", "pharmacy"]);
+              setHMarkers(items.slice(0, 20));
+              setHLoading(false);
+              return;
+            } catch {}
+          }
+
+          // Fallback: Overpass
           const elems = await fetchOSMHealth(lat, lon, hRadius);
           let items = (elems || [])
             .map((e) => ({
@@ -292,7 +308,7 @@ export default function Home({ t, setTab, user }) {
 
           {hLatlon ? (
             <div className="w-full h-56">
-                <MapPreview center={hLatlon} markers={hMarkers} radiusKm={hRadius} />
+                <GoogleMapPreview center={hLatlon} markers={hMarkers} radiusKm={hRadius} />
             </div>
           ) : (
             <div className="h-48 flex flex-col items-center justify-center text-gray-400 bg-gray-100/50">

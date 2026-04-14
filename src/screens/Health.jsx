@@ -1,8 +1,9 @@
 import { useState } from "react";
 import Card from "../components/Card";
 import PrimaryButton from "../components/PrimaryButton";
-import MapPreview from "../components/MapPreview";
+import GoogleMapPreview from "../components/GoogleMapPreview";
 import { geocodePlace, fetchOSMHealth, matchGovernment, haversineKm, deriveType, saveCache, loadCache } from "../utils/osm";
+import { loadGoogleMaps, searchMultipleTypes, isGoogleMapsAvailable } from "../utils/googleMaps";
 
 export default function Health({ t }) {
   const [place, setPlace] = useState("");
@@ -44,8 +45,36 @@ export default function Health({ t }) {
 
   async function search() {
     if (!latlon) { setError("noloc"); return; }
+    setError(null); setLoading(true); setResults([]); setUseCacheBanner(false);
+
+    // Build type list for Google Places
+    const gTypes = [];
+    if (types.hospital) gTypes.push("hospital");
+    if (types.clinic) gTypes.push("doctor");
+    if (types.pharmacy) gTypes.push("pharmacy");
+    if (types.doctors) gTypes.push("doctor");
+
+    // Try Google Places first
+    if (isGoogleMapsAvailable() && gTypes.length > 0) {
+      try {
+        const maps = await loadGoogleMaps();
+        // Create a hidden map for PlacesService (reuse if possible)
+        const tempDiv = document.createElement("div");
+        const tempMap = new maps.Map(tempDiv, { center: { lat: latlon.lat, lng: latlon.lon }, zoom: 13 });
+        let items = await searchMultipleTypes(tempMap, latlon, radius * 1000, gTypes);
+        items = items.filter(matchesServices);
+        items = items.slice(0, 50);
+        setResults(items);
+        saveCache("health_cache_last", { lat: latlon.lat, lon: latlon.lon, radius, items });
+        setLoading(false);
+        return;
+      } catch {
+        // Fall through to Overpass
+      }
+    }
+
+    // Fallback: Overpass API
     try {
-      setError(null); setLoading(true); setResults([]); setUseCacheBanner(false);
       const elems = await fetchOSMHealth(latlon.lat, latlon.lon, radius);
       let items = (elems || []).map((e) => ({ id: `${e.type}/${e.id}`, name: e.tags?.name || "Unnamed", lat: e.lat, lon: e.lon, tags: e.tags || {} }))
         .filter((x) => Number.isFinite(x.lat) && Number.isFinite(x.lon))
@@ -100,7 +129,7 @@ export default function Health({ t }) {
       {latlon && (
         <Card>
           <div className="font-semibold mb-2">Map</div>
-          <MapPreview center={latlon} markers={results} radiusKm={radius} />
+          <GoogleMapPreview center={latlon} markers={results} radiusKm={radius} />
         </Card>
       )}
 
