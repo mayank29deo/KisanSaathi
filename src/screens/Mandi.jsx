@@ -96,14 +96,22 @@ export default function Mandi({ t }) {
 
   const isFiltered = !!(search || state || commodity);
 
-  // Source: live data if available, else local engine
-  const source = liveData?.records?.length > 0 ? "live" : "local";
+  // Merge: live data first, then fill gaps with local fallback
+  const hasLive = liveData?.records?.length > 0;
   const allPrices = useMemo(() => {
-    if (liveData?.records?.length > 0) {
-      return liveData.records.map(normalizeLiveRecord);
-    }
-    return localPrices;
-  }, [liveData, localPrices]);
+    const liveNormalized = hasLive ? liveData.records.map(normalizeLiveRecord) : [];
+
+    // Track which commodity+state combos live data already covers
+    const coveredKeys = new Set(liveNormalized.map((p) => `${p.commodityId}|${p.state}`));
+
+    // Add local fallback records for any commodity+state NOT covered by live data
+    const fallbackRecords = localPrices.filter((p) => !coveredKeys.has(`${p.commodityId}|${p.state}`));
+
+    return [...liveNormalized, ...fallbackRecords];
+  }, [liveData, localPrices, hasLive]);
+
+  const liveCount = hasLive ? liveData.records.length : 0;
+  const source = hasLive ? "live" : "local";
 
   // Fetch live data from data.gov.in on mount (if cache expired)
   useEffect(() => {
@@ -253,7 +261,7 @@ export default function Mandi({ t }) {
         </p>
         <p className="text-xs text-gray-400 mt-0.5">
           {todayStr}
-          {source === "live" && liveData?.total && ` · ${liveData.total.toLocaleString("en-IN")} records across India`}
+          {hasLive && ` · ${liveCount} live + ${allPrices.length - liveCount} estimated`}
         </p>
       </div>
 
