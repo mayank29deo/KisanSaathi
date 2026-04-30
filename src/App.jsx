@@ -125,7 +125,7 @@ export default function App() {
         <TabButton active={tab === "advisory"} label={t.advisory} onClick={() => setTab("advisory")} icon="🧑‍🌾" />
         <TabButton active={tab === "detect"}   label={t.detect}   onClick={() => setTab("detect")}   icon="📷" />
         <TabButton active={tab === "health"}   label={t.health}   onClick={() => setTab("health")}   icon="🏥" />
-        <TabButton active={tab === "earn"}     label={t.earn}     onClick={() => setTab("earn")}     icon="💰" />
+        <TabButton active={tab === "earn"}     label={t.earn}     onClick={() => setTab("earn")}     icon="🪙" />
       </div>
 
       {/* Profile Modal */}

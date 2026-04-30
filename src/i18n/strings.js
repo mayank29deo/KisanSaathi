@@ -14,7 +14,7 @@ const STRINGS = {
     settings: "Settings",
 
     // Earn screen
-    earnHeroTitle: "Earn ₹10 for every 10 prices logged 💰",
+    earnHeroTitle: "Earn ₹10 for every 10 prices logged 🪙",
     earnHeroSub: "Help farmers across India get accurate prices — and get paid into your bank account.",
     earnPerEntry: "₹1 per verified entry",
     earnBalance: "Your balance",
@@ -259,7 +259,7 @@ const STRINGS = {
     settings: "सेटिंग्स",
 
     // Earn screen
-    earnHeroTitle: "हर 10 भाव दर्ज करने पर ₹10 कमाएँ 💰",
+    earnHeroTitle: "हर 10 भाव दर्ज करने पर ₹10 कमाएँ 🪙",
     earnHeroSub: "देश भर के किसानों को सही भाव दिलाने में मदद करें — सीधे आपके बैंक खाते में पैसा।",
     earnPerEntry: "हर सत्यापित प्रविष्टि पर ₹1",
     earnBalance: "आपकी कमाई",
@@ -503,7 +503,7 @@ const STRINGS = {
     settings: "সেটিংস",
 
     // Earn screen
-    earnHeroTitle: "প্রতি ১০টি দাম লগ করলে ₹১০ আয় করুন 💰",
+    earnHeroTitle: "প্রতি ১০টি দাম লগ করলে ₹১০ আয় করুন 🪙",
     earnHeroSub: "ভারতের কৃষকদের সঠিক দাম পেতে সাহায্য করুন — সরাসরি আপনার ব্যাঙ্ক অ্যাকাউন্টে অর্থ পান।",
     earnPerEntry: "প্রতি যাচাইকৃত এন্ট্রিতে ₹১",
     earnBalance: "আপনার ব্যালেন্স",

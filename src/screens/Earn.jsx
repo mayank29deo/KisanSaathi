@@ -136,10 +136,10 @@ export default function Earn({ t, user }) {
         initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
         className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 p-6 text-white shadow-xl"
       >
-        <div className="absolute -top-8 -right-8 text-[140px] opacity-20 select-none">💰</div>
+        <div className="absolute -top-10 -right-2 text-[180px] font-black opacity-15 select-none leading-none pointer-events-none">₹</div>
         <div className="relative">
           <div className="text-xs font-semibold tracking-widest opacity-90">EARN WITH KISAN SAATHI</div>
-          <h1 className="text-2xl font-extrabold mt-2 leading-tight">{t.earnHeroTitle || "Earn ₹10 for every 10 prices logged 💰"}</h1>
+          <h1 className="text-2xl font-extrabold mt-2 leading-tight">{t.earnHeroTitle || "Earn ₹10 for every 10 prices logged 🪙"}</h1>
           <p className="text-sm mt-2 opacity-95">{t.earnHeroSub}</p>
           <div className="mt-3 inline-flex items-center gap-2 bg-white/20 backdrop-blur rounded-full px-3 py-1 text-xs font-semibold">
             ✨ {t.earnPerEntry}

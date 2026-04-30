@@ -218,7 +218,7 @@ export default function Home({ t, setTab, user }) {
         onClick={() => setTab("earn")}
         className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 shadow-lg cursor-pointer active:scale-[0.99] transition-all"
       >
-        <div className="absolute -top-6 -right-6 text-[120px] opacity-20 select-none pointer-events-none">💰</div>
+        <div className="absolute -top-8 -right-1 text-[150px] font-black opacity-15 select-none leading-none pointer-events-none">₹</div>
         <div className="relative p-5 text-white">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[10px] font-bold tracking-widest bg-white/20 backdrop-blur px-2 py-0.5 rounded-full">NEW</span>
