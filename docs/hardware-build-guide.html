@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>KisanSaathi — Hardware Prototype Build Guide</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.55;
+    color: #1a1a1a;
+    max-width: 180mm;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 22pt;
+    color: #047857;
+    border-bottom: 3px solid #10b981;
+    padding-bottom: 8px;
+    margin-top: 0;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    font-size: 11pt;
+    color: #555;
+    margin-bottom: 20px;
+  }
+  h2 {
+    font-size: 14pt;
+    color: #065f46;
+    background: #d1fae5;
+    padding: 6px 12px;
+    border-radius: 6px;
+    margin-top: 22px;
+    margin-bottom: 10px;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 12pt;
+    color: #047857;
+    margin-top: 14px;
+    margin-bottom: 6px;
+    page-break-after: avoid;
+  }
+  h4 {
+    font-size: 11pt;
+    color: #374151;
+    margin-top: 10px;
+    margin-bottom: 4px;
+  }
+  p { margin: 6px 0; }
+  ul, ol { margin: 6px 0 6px 22px; padding: 0; }
+  li { margin: 2px 0; }
+  code {
+    font-family: "SF Mono", Consolas, monospace;
+    background: #f3f4f6;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 9.5pt;
+    color: #be123c;
+  }
+  pre {
+    background: #1e293b;
+    color: #e2e8f0;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 8.5pt;
+    line-height: 1.45;
+    overflow-x: auto;
+    page-break-inside: avoid;
+  }
+  pre code { background: transparent; color: inherit; padding: 0; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 10px 0;
+    font-size: 9.5pt;
+    page-break-inside: avoid;
+  }
+  th, td {
+    border: 1px solid #d1d5db;
+    padding: 6px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #ecfdf5;
+    color: #065f46;
+    font-weight: 600;
+  }
+  tr:nth-child(even) td { background: #f9fafb; }
+  .callout {
+    background: #fef3c7;
+    border-left: 4px solid #f59e0b;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin: 10px 0;
+  }
+  .callout-info {
+    background: #dbeafe;
+    border-left: 4px solid #3b82f6;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin: 10px 0;
+  }
+  .pass {
+    color: #047857;
+    font-weight: 600;
+  }
+  .section-break { page-break-before: always; }
+  .badge {
+    display: inline-block;
+    background: #10b981;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 8.5pt;
+    font-weight: 600;
+  }
+  .step-header {
+    background: linear-gradient(135deg, #047857, #10b981);
+    color: white;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 13pt;
+    font-weight: 600;
+    margin-top: 22px;
+    margin-bottom: 10px;
+    page-break-after: avoid;
+  }
+  .ascii {
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 8pt;
+    line-height: 1.3;
+    background: #f3f4f6;
+    padding: 10px;
+    border-radius: 4px;
+    white-space: pre;
+    page-break-inside: avoid;
+  }
+  .footer-note {
+    margin-top: 30px;
+    padding-top: 14px;
+    border-top: 1px solid #d1d5db;
+    font-size: 9pt;
+    color: #6b7280;
+    font-style: italic;
+  }
+  hr {
+    border: none;
+    border-top: 1px solid #e5e7eb;
+    margin: 16px 0;
+  }
+</style>
+</head>
+<body>
+
+<h1>KisanSaathi — Hardware Prototype Build Guide</h1>
+<div class="subtitle">Compact solar-powered soil sensor device — step-by-step implementation plan for the hardware team</div>
+
+<div class="callout-info">
+<strong>Project context:</strong> This device is the field-sensing unit for the KisanSaathi platform. It measures soil N-P-K, pH, EC, moisture, and temperature, plus ambient air conditions, and uploads readings to the KisanSaathi backend. Data feeds into the Crop Recommendation screen, replacing the current hardcoded ICAR district averages with live, team-measured values.
+</div>
+
+<h2>Target Form Factor</h2>
+<ul>
+<li>Housing dimensions: <strong>100 × 70 × 35 mm</strong> (size of a phone)</li>
+<li>Probe length: <strong>150 mm</strong> stainless steel (embedded into soil)</li>
+<li>Total length with probe: <strong>~250 mm</strong></li>
+<li>Weight: <strong>~200 g</strong></li>
+<li>Solar panel: <strong>integrated flush into lid</strong> — no external wiring</li>
+<li>Ingress protection: <strong>IP67</strong></li>
+<li>Battery life (no sun): <strong>9+ days</strong></li>
+</ul>
+
+<div class="ascii">
+ ┌──────────────────┐   ← Solar panel (80×60mm) top-mounted
+ │ ░░░░░░░░░░░░░░░░ │     epoxy-sealed into lid
+ ├──────────────────┤
+ │                  │ ← Electronics housing
+ │   100×70×35mm    │     Contains: PCB + battery + MPPT
+ │   IP67 enclosure │
+ └────────┬─────────┘
+          │           ← Short cable (waterproof gland)
+      ┏━━━┻━━━┓       ← Probe head (plastic)
+      ┃       ┃
+      ┃       ┃       ← Stainless steel probe (150mm)
+      ┃       ┃         Measures: N, P, K, pH, EC, moisture, temperature
+      ┗━━━━━━━┛
+</div>
+
+<h2>Power Budget (Why It Works)</h2>
+<p><strong>Solar input (60×60 mm 1W panel, India avg):</strong> 5 peak sun hours × 1W × 70% efficiency = ~3.5 Wh/day → ~950 mAh/day into the 3.7V battery.</p>
+
+<table>
+<tr><th>State</th><th>Current</th><th>Duration</th><th>Energy per cycle</th></tr>
+<tr><td>ESP32 deep sleep</td><td>10 µA</td><td>14m 50s</td><td>negligible</td></tr>
+<tr><td>Sensor read</td><td>70 mA</td><td>3 s</td><td>~2 mWh</td></tr>
+<tr><td>WiFi + HTTPS POST</td><td>160 mA</td><td>5 s</td><td>~7 mWh</td></tr>
+<tr><td colspan="3"><strong>Daily total (96 cycles)</strong></td><td><strong>~230 mAh/day</strong></td></tr>
+</table>
+
+<p><strong>Net: +720 mAh/day surplus.</strong> A 2000 mAh battery gives 9+ days of dark-weather runtime with healthy margin.</p>
+
+<div class="section-break"></div>
+
+<div class="step-header">STEP 1 — Procure Components (Day 1–3)</div>
+
+<p>Order from <strong>Robu.in</strong>, <strong>ElectronicsComp</strong>, or <strong>Amazon India</strong>. Keep quantities 2× for spares.</p>
+
+<h3>Core Shopping List (Prototype v1 — breadboard friendly)</h3>
+<table>
+<tr><th>#</th><th>Item</th><th>Qty</th><th>Where</th><th>₹ (approx)</th></tr>
+<tr><td>1</td><td>ESP32-WROOM-32 DevKit V1 (38-pin)</td><td>2</td><td>Robu.in</td><td>500 each</td></tr>
+<tr><td>2</td><td>JXBS-3001-NPK-TR-ECTH 7-in-1 soil probe (RS485)</td><td>1</td><td>Robu.in / Moisture Meter India</td><td>6,500</td></tr>
+<tr><td>3</td><td>MAX485 TTL-RS485 module</td><td>2</td><td>Robu.in</td><td>50 each</td></tr>
+<tr><td>4</td><td>USB to RS485 adapter (FTDI or CH340)</td><td>1</td><td>Robu.in (PC-side testing)</td><td>300</td></tr>
+<tr><td>5</td><td>BME280 breakout (I2C)</td><td>1</td><td>Robu.in</td><td>280</td></tr>
+<tr><td>6</td><td>6V 2W Monocrystalline solar panel (110×60 mm)</td><td>1</td><td>Robu.in</td><td>350</td></tr>
+<tr><td>7</td><td>CN3791 MPPT solar LiPo charger module</td><td>1</td><td>Robu.in</td><td>120</td></tr>
+<tr><td>8</td><td>TP4056 charging module (backup option)</td><td>1</td><td>Robu.in</td><td>30</td></tr>
+<tr><td>9</td><td>3.7V 2000mAh LiPo battery w/ JST-PH connector</td><td>1</td><td>Robu.in</td><td>450</td></tr>
+<tr><td>10</td><td>MT3608 boost / MP1584 buck converter module</td><td>1</td><td>Robu.in</td><td>80</td></tr>
+<tr><td>11</td><td>Breadboard 830-point</td><td>1</td><td>any</td><td>150</td></tr>
+<tr><td>12</td><td>Male-male + male-female jumper wire kit</td><td>1</td><td>any</td><td>200</td></tr>
+<tr><td>13</td><td>USB-C cable + 5V 2A adapter</td><td>1</td><td>any</td><td>250</td></tr>
+</table>
+<p><strong>Total: ~₹9,300</strong></p>
+
+<h3>Tools Required Before Starting</h3>
+<ul>
+<li>Soldering iron (25–40W) + lead-free solder + flux</li>
+<li>Multimeter (basic Fluke-clone is fine)</li>
+<li>Wire strippers, tweezers, side cutters</li>
+<li>Laptop with USB-C port</li>
+<li>Heat shrink tubing + hot glue gun</li>
+<li>Shoebox of soil for bench testing (with known moisture level)</li>
+</ul>
+
+<div class="section-break"></div>
+
+<div class="step-header">STEP 2 — Verify Each Component Individually (Day 4–5)</div>
+
+<div class="callout">
+Do not skip this step. Test every part works before connecting anything together. Finding a dead component later in integration costs hours of debugging.
+</div>
+
+<h3>2a. ESP32 health check</h3>
+<ol>
+<li>Install Arduino IDE 2.x</li>
+<li>Add ESP32 board package: <code>https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json</code></li>
+<li>Select board: "ESP32 Dev Module"</li>
+<li>Upload Blink example — onboard LED should blink</li>
+<li>Open Serial Monitor at 115200 — see boot messages</li>
+</ol>
+<p class="pass">✅ Pass → ESP32 works</p>
+
+<h3>2b. Soil probe health check (PC-side, using USB-RS485 adapter)</h3>
+<ol>
+<li>Connect probe → USB-RS485 adapter → laptop</li>
+<li>Download "Modbus Poll" (free trial) or use Python <code>minimalmodbus</code></li>
+<li>Probe default settings: <strong>9600 baud, 8N1, slave ID 0x01</strong></li>
+<li>Read registers:
+  <ul>
+    <li><code>0x0000</code> → soil moisture (÷10 for %)</li>
+    <li><code>0x0001</code> → soil temperature (÷10 for °C)</li>
+    <li><code>0x0002</code> → EC (µS/cm)</li>
+    <li><code>0x0003</code> → pH (÷10)</li>
+    <li><code>0x0004</code> → nitrogen (mg/kg)</li>
+    <li><code>0x0005</code> → phosphorus (mg/kg)</li>
+    <li><code>0x0006</code> → potassium (mg/kg)</li>
+  </ul>
+</li>
+<li>Stick probe in dry pot → readings should be low moisture. Water it → moisture rises in 30 sec.</li>
+</ol>
+<p class="pass">✅ Pass → Probe works, register map confirmed</p>
+
+<h3>2c. Solar panel check</h3>
+<ol>
+<li>Point at sun (midday)</li>
+<li>Multimeter across output → should read <strong>6.0–7.2V open circuit</strong></li>
+<li>Short-circuit current (brief): ~300–350 mA</li>
+</ol>
+<p class="pass">✅ Pass → Solar panel works</p>
+
+<h3>2d. Battery + charger check</h3>
+<ol>
+<li>Connect battery to CN3791 BAT+/BAT− terminals</li>
+<li>Connect solar panel to SOLAR+/SOLAR− terminals</li>
+<li>In sun → CHRG LED lights up</li>
+<li>Multimeter on battery → voltage slowly rises toward 4.2V</li>
+</ol>
+<p class="pass">✅ Pass → Charging circuit works</p>
+
+<h3>2e. BME280 check</h3>
+<ol>
+<li>Wire to ESP32: VCC→3.3V, GND→GND, SDA→GPIO21, SCL→GPIO22</li>
+<li>Install <code>Adafruit BME280</code> library</li>
+<li>Run example sketch → serial should print temp/humidity/pressure</li>
+</ol>
+<p class="pass">✅ Pass → Air sensor works</p>
+
+<div class="section-break"></div>
+
+<div class="step-header">STEP 3 — Breadboard Integration (Day 6–7)</div>
+
+<p>Wire everything on a breadboard. <strong>Power via USB for now — no battery yet.</strong></p>
+
+<div class="ascii">
+                     ESP32 DevKit
+                   ┌─────────────────┐
+   Solar 6V ───────┤ (VIN via MPPT)  │
+                   │                 │
+   BME280 SDA ─────┤ GPIO21 (SDA)    │
+   BME280 SCL ─────┤ GPIO22 (SCL)    │
+   BME280 VCC ─────┤ 3.3V            │
+   BME280 GND ─────┤ GND             │
+                   │                 │
+                   │ GPIO17 (TX2) ───┼── MAX485 DI
+                   │ GPIO16 (RX2) ───┼── MAX485 RO
+                   │ GPIO4 (DE+RE) ──┼── MAX485 DE & RE tied
+                   │ 5V ─────────────┼── MAX485 VCC
+                   │ GND ────────────┼── MAX485 GND
+                   │                 │
+                   │                 │   MAX485
+                   │                 │   ┌──────┐
+                   │                 │   │  A  ─┼── Probe RS485 A (yellow)
+                   │                 │   │  B  ─┼── Probe RS485 B (blue)
+                   │                 │   └──────┘
+                   │                 │
+                   │                 │   Probe power:
+                   │                 │   +12V ← boost from battery
+                   │                 │   GND
+                   └─────────────────┘
+</div>
+
+<div class="callout">
+<strong>Critical:</strong> The 7-in-1 probe needs <strong>12V power</strong> (not 3.3V or 5V). Use MT3608 boost converter: input 3.7V from battery, output set to 12V via trimpot. Measure with multimeter before connecting probe.
+</div>
+
+<div class="section-break"></div>
+
+<div class="step-header">STEP 4 — Firmware Bring-Up (Day 8–10)</div>
+
+<p>Follow a layered approach. Get each layer working before moving on.</p>
+
+<h3>4a. Read soil probe from ESP32</h3>
+<pre><code>#include &lt;ModbusMaster.h&gt;
+ModbusMaster node;
+void preTransmission()  { digitalWrite(4, 1); }
+void postTransmission() { digitalWrite(4, 0); }
+
+void setup() {
+  Serial.begin(115200);
+  Serial2.begin(9600, SERIAL_8N1, 16, 17);
+  pinMode(4, OUTPUT);
+  node.begin(1, Serial2);
+  node.preTransmission(preTransmission);
+  node.postTransmission(postTransmission);
+}
+
+void loop() {
+  if (node.readHoldingRegisters(0x0000, 7) == node.ku8MBSuccess) {
+    Serial.printf("Moisture: %.1f%%\n",  node.getResponseBuffer(0)/10.0);
+    Serial.printf("Temp:     %.1fC\n",   node.getResponseBuffer(1)/10.0);
+    Serial.printf("EC:       %d uS/cm\n",node.getResponseBuffer(2));
+    Serial.printf("pH:       %.1f\n",    node.getResponseBuffer(3)/10.0);
+    Serial.printf("N:        %d mg/kg\n",node.getResponseBuffer(4));
+    Serial.printf("P:        %d mg/kg\n",node.getResponseBuffer(5));
+    Serial.printf("K:        %d mg/kg\n",node.getResponseBuffer(6));
+  }
+  delay(5000);
+}</code></pre>
+<p class="pass">✅ Serial shows all 7 values</p>
+
+<h3>4b. Add BME280 reads</h3>
+<p>Merge Adafruit BME280 example into above. Print air temp/humidity too.</p>
+
+<h3>4c. Add WiFi + HTTPS POST</h3>
+<p>Connect to home/lab WiFi. POST JSON payload to a test endpoint (use webhook.site for a free test URL):</p>
+<pre><code>HTTPClient http;
+http.begin("https://webhook.site/YOUR-UNIQUE-ID");
+http.addHeader("Content-Type", "application/json");
+int code = http.POST(jsonPayload);</code></pre>
+<p class="pass">✅ Data lands at webhook.site</p>
+
+<h3>4d. Add deep sleep</h3>
+<pre><code>esp_sleep_enable_timer_wakeup(15 * 60 * 1000000ULL); // 15 min
+esp_deep_sleep_start();</code></pre>
+<p class="pass">✅ Current drops to µA level between wakes</p>
+
+<div class="section-break"></div>
+
+<div class="step-header">STEP 5 — Power System Integration (Day 11–12)</div>
+
+<p>Disconnect USB and run from solar+battery.</p>
+
+<ol>
+<li>Solar panel (+) → CN3791 SOLAR+</li>
+<li>Solar panel (−) → CN3791 SOLAR−</li>
+<li>LiPo (+) → CN3791 BAT+</li>
+<li>LiPo (−) → CN3791 BAT−</li>
+<li>CN3791 OUT+ → MT3608 IN+ (boost to 12V for probe) <strong>and</strong> → ESP32 VIN</li>
+<li>CN3791 OUT− → all GND</li>
+<li>Adjust MT3608 trimpot to exactly <strong>12.0V</strong> before connecting probe</li>
+</ol>
+
+<h3>Measure with multimeter:</h3>
+<ul>
+<li>Battery voltage: 3.7–4.2V depending on charge</li>
+<li>Probe supply: 12.0V</li>
+<li>ESP32 VIN: comes from battery via CN3791, ~3.7–4.2V</li>
+</ul>
+
+<h3>Run device for 24 hours unattended:</h3>
+<ul>
+<li>Check data still arrives at webhook.site every 15 min</li>
+<li>Check battery voltage in morning — should be ≥3.8V</li>
+</ul>
+<p class="pass">✅ Pass → Power system is sound</p>
+
+<div class="section-break"></div>
+
+<div class="step-header">STEP 6 — PCB Design (Day 13–20)</div>
+
+<p>Once breadboard is stable, shrink to a PCB.</p>
+<ol>
+<li>Install <strong>KiCad 8</strong> (free)</li>
+<li>Schematic: ESP32-C3-MINI-1 module + MAX3485 + CN3791 + MT3608 equivalent + USB-C + JST-PH battery connector + BME280 on-board</li>
+<li>Layout: target <strong>50×60 mm 2-layer PCB</strong></li>
+<li>Export Gerbers → upload to <strong>JLCPCB</strong></li>
+<li>Order 10 boards with JLC SMT assembly for all parts except the ESP32 module and connectors</li>
+<li>Cost: <strong>~₹4000 for 10 assembled boards</strong> including shipping to India</li>
+</ol>
+<p><strong>Timeline:</strong> PCBs arrive ~8–10 days after order.</p>
+
+<div class="callout-info">
+You can skip Step 6 entirely for v1 prototype — just build 2-3 breadboard units for field testing. PCB is for v2.
+</div>
+
+<div class="step-header">STEP 7 — Enclosure Fabrication (Day 13–17, parallel with PCB)</div>
+
+<ol>
+<li><strong>Measure</strong> your assembled breadboard stack: width × length × height. Add 5 mm clearance each side.</li>
+<li><strong>Model in FreeCAD / Fusion 360:</strong>
+  <ul>
+    <li>Two-piece case: bottom (deep) + lid</li>
+    <li>Recessed cavity in lid for solar panel</li>
+    <li>Cable gland hole at bottom-center for probe cable</li>
+    <li>M3 heat-set inserts for lid screws</li>
+    <li>Silicone gasket groove around mating surface</li>
+  </ul>
+</li>
+<li><strong>3D print</strong> in PETG (UV-resistant) — use a local printing service (~₹300–500 for both pieces)</li>
+<li><strong>Pot the solar panel</strong> into the lid recess with clear UV-curing epoxy</li>
+<li><strong>Fit gasket</strong>, assemble with M3 screws</li>
+<li><strong>Waterproof test:</strong> submerge empty enclosure in bucket of water for 30 min → open → check for moisture inside</li>
+</ol>
+
+<div class="section-break"></div>
+
+<div class="step-header">STEP 8 — Final Assembly (Day 21–23)</div>
+
+<ol>
+<li>Place PCB (or breadboard stack) inside enclosure</li>
+<li>Double-sided foam tape under PCB</li>
+<li>Battery in its silicone-lined compartment (keep away from ESP32 heat)</li>
+<li>Pass probe cable through PG7 gland → tighten gland</li>
+<li>Connect cable terminals inside</li>
+<li>Smoke test: close lid, power via solar, check WiFi connection</li>
+<li>Seal lid with gasket + screws</li>
+</ol>
+
+<div class="step-header">STEP 9 — Field Calibration (Day 24–26)</div>
+
+<ol>
+<li><strong>Collect 3 soil samples</strong> from 3 different plots where device will deploy</li>
+<li><strong>Send samples to a certified soil lab</strong> (NABL-accredited, ~₹500/sample for N/P/K/pH)</li>
+<li><strong>Take device readings at the exact same spots</strong> on the same day</li>
+<li><strong>Calculate offset/scaling factors</strong> between device and lab values</li>
+<li><strong>Store calibration constants in EEPROM / NVS on the device</strong></li>
+<li>Firmware applies correction on each read</li>
+</ol>
+
+<div class="step-header">STEP 10 — Field Deployment (Day 27+)</div>
+
+<ol>
+<li>Install device in target field — probe in soil, housing above ground level</li>
+<li>Sun exposure must be ≥4 hours/day — avoid shade under trees</li>
+<li>Ensure WiFi signal reachable (RSSI > −75 dBm)</li>
+<li>Run for <strong>14 days</strong></li>
+<li>Monitor dashboard for:
+  <ul>
+    <li>Data continuity (no gaps)</li>
+    <li>Battery voltage trends</li>
+    <li>Reading sanity vs weather</li>
+  </ul>
+</li>
+<li>Fix issues → reflash OTA → repeat</li>
+</ol>
+
+<div class="section-break"></div>
+
+<h2>Critical Path Summary</h2>
+
+<table>
+<tr><th>Week</th><th>Milestones</th></tr>
+<tr><td><strong>Week 1</strong></td><td>Order parts, tools, test each component individually</td></tr>
+<tr><td><strong>Week 2</strong></td><td>Breadboard integration, firmware layers 4a–4d</td></tr>
+<tr><td><strong>Week 3</strong></td><td>Power system + 24hr bench test; start PCB + enclosure in parallel</td></tr>
+<tr><td><strong>Week 4</strong></td><td>PCB arrives, enclosure printed, final assembly</td></tr>
+<tr><td><strong>Week 5</strong></td><td>Lab calibration</td></tr>
+<tr><td><strong>Week 6</strong></td><td>Field deployment + iteration</td></tr>
+</table>
+
+<p style="margin-top:14px;"><strong>Total: ~6 weeks to a working field prototype.</strong></p>
+
+<h2>Key Design Decisions (Locked)</h2>
+<ul>
+<li><strong>Connectivity:</strong> WiFi-only for prototype v1 (4G variant for v2)</li>
+<li><strong>MCU:</strong> ESP32-WROOM-32 for prototype; migrate to ESP32-C3-MINI-1 on custom PCB</li>
+<li><strong>Solar panel:</strong> ETFE-laminated monocrystalline for 10+ year outdoor lifespan</li>
+<li><strong>Probe:</strong> Off-the-shelf JXBS-3001 7-in-1 for v1; custom probe only if volume justifies</li>
+<li><strong>Sample interval:</strong> 15 minutes</li>
+<li><strong>Data transmission:</strong> HTTPS POST to KisanSaathi Vercel backend, HMAC-signed</li>
+</ul>
+
+<h2>Honest Technical Risks</h2>
+<ul>
+<li><strong>NPK accuracy:</strong> Dielectric-based NPK sensors measure soil EC and infer nutrient levels via proprietary formulas. Accuracy ±10–20% for trends, not lab-grade for absolute values. Market as trend monitoring, not lab replacement.</li>
+<li><strong>Battery life during monsoon:</strong> Low solar + high humidity. Size solar/battery with 2× margin.</li>
+<li><strong>Field theft/tampering:</strong> Consider anti-tamper design and GPS geofencing alerts.</li>
+<li><strong>Rural connectivity:</strong> 2G/3G patchy. LoRaWAN with on-farm gateway is backup path.</li>
+<li><strong>Probe corrosion:</strong> Stainless steel probes last 2–3 years. Design for field-replacement.</li>
+</ul>
+
+<h2>Immediate Action Items for Team</h2>
+
+<ol>
+<li><strong>Today:</strong> Place the Robu.in order from Step 1 (soil probe has longest lead time, ~5–7 days)</li>
+<li><strong>Confirm tool availability</strong> — soldering iron, multimeter, 3D printing access</li>
+<li><strong>Week 1:</strong> Execute Step 2 (individual component validation) as parts arrive</li>
+<li><strong>Assign roles:</strong>
+  <ul>
+    <li>Hardware lead: component sourcing, soldering, assembly</li>
+    <li>Firmware lead: Arduino/PlatformIO development</li>
+    <li>Mechanical lead: enclosure design, 3D printing</li>
+    <li>Testing lead: calibration, field deployment</li>
+  </ul>
+</li>
+<li><strong>Coordinate with software team</strong> on API endpoint for data ingestion (Vercel + Supabase)</li>
+</ol>
+
+<div class="footer-note">
+Document generated for the KisanSaathi hardware team. Source: KisanSaathi engineering planning session.<br>
+For firmware source code, PCB schematics, or enclosure STL files, contact the project lead.
+</div>
+
+</body>
+</html>

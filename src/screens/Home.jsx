@@ -213,6 +213,27 @@ export default function Home({ t, setTab, user }) {
         </div>
       </div>
 
+      {/* Earn Banner — high-priority CTA for the new revenue feature */}
+      <div
+        onClick={() => setTab("earn")}
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 shadow-lg cursor-pointer active:scale-[0.99] transition-all"
+      >
+        <div className="absolute -top-6 -right-6 text-[120px] opacity-20 select-none pointer-events-none">💰</div>
+        <div className="relative p-5 text-white">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-bold tracking-widest bg-white/20 backdrop-blur px-2 py-0.5 rounded-full">NEW</span>
+            <span className="text-xs font-semibold opacity-90">EARN MONEY</span>
+          </div>
+          <div className="text-lg font-extrabold leading-tight">
+            {t.earnHeroTitle || "Earn ₹10 for every 10 prices logged 💰"}
+          </div>
+          <div className="text-xs opacity-90 mt-1">{t.earnPerEntry} · {t.earnPayoutThreshold}</div>
+          <div className="inline-flex items-center gap-1 mt-3 bg-white text-orange-700 font-bold text-xs px-3 py-1.5 rounded-full shadow">
+            {t.earnLogPrice} →
+          </div>
+        </div>
+      </div>
+
       {/* Voice Assistant */}
       <VoiceAssistant t={t} lang={t._lang || "en"} />
 
@@ -270,12 +291,21 @@ export default function Home({ t, setTab, user }) {
             />
 
             {/* Detect */}
-            <ServiceCard 
-              icon="📸" 
-              color="bg-purple-100" 
+            <ServiceCard
+              icon="📸"
+              color="bg-purple-100"
               title={t.detect || "Detect"}
               desc="Scan Crops"
               onClick={() => setTab("detect")}
+            />
+
+            {/* Sell — moved here from the bottom tab bar */}
+            <ServiceCard
+              icon="🛒"
+              color="bg-amber-100"
+              title={t.sell || "Sell"}
+              desc="Hyperpure, Amazon, eNAM"
+              onClick={() => setTab("sell")}
             />
           </div>
         </div>

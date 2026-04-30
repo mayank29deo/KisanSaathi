@@ -11,6 +11,7 @@ import Advisory from "./screens/Advisory";
 import Detector from "./screens/Detector";
 import Health from "./screens/Health";
 import Sell from "./screens/Sell";
+import Earn from "./screens/Earn";
 import AuthScreen from "./screens/AuthScreen";
 
 // Components
@@ -112,10 +113,11 @@ export default function App() {
           {tab === "detect" && <Detector t={t} />}
           {tab === "health" && <Health t={t} />}
           {tab === "sell" && <Sell t={t} />}
+          {tab === "earn" && <Earn t={t} user={user} />}
         </AnimatePresence>
       </div>
 
-      {/* Bottom Tabs */}
+      {/* Bottom Tabs — 7 tabs but Sell moved to Home, replaced with Earn */}
       <div className="fixed bottom-0 inset-x-0 bg-white border-t p-2 grid grid-cols-7">
         <TabButton active={tab === "home"}     label={t.home}     onClick={() => setTab("home")}     icon="🏠" />
         <TabButton active={tab === "mandi"}    label={t.mandi}    onClick={() => setTab("mandi")}    icon="🧾" />
@@ -123,7 +125,7 @@ export default function App() {
         <TabButton active={tab === "advisory"} label={t.advisory} onClick={() => setTab("advisory")} icon="🧑‍🌾" />
         <TabButton active={tab === "detect"}   label={t.detect}   onClick={() => setTab("detect")}   icon="📷" />
         <TabButton active={tab === "health"}   label={t.health}   onClick={() => setTab("health")}   icon="🏥" />
-        <TabButton active={tab === "sell"}     label={t.sell}     onClick={() => setTab("sell")}     icon="🛒" />
+        <TabButton active={tab === "earn"}     label={t.earn}     onClick={() => setTab("earn")}     icon="💰" />
       </div>
 
       {/* Profile Modal */}
