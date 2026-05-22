@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Analytics } from "@vercel/analytics/react";
 import STRINGS from "./i18n/strings";
 import { useAuth } from "./hooks/useAuth";
 
@@ -50,14 +51,17 @@ export default function App() {
   // Auth gate
   if (!user) {
     return (
-      <AuthScreen
-        t={t}
-        onAuth={(mode, data) => {
-          if (mode === "register") return register(data);
-          return login(data.phone);
-        }}
-        onGoogleSignIn={signInWithGoogle}
-      />
+      <>
+        <AuthScreen
+          t={t}
+          onAuth={(mode, data) => {
+            if (mode === "register") return register(data);
+            return login(data.phone);
+          }}
+          onGoogleSignIn={signInWithGoogle}
+        />
+        <Analytics />
+      </>
     );
   }
 
@@ -142,6 +146,8 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      <Analytics />
     </div>
   );
 }
