@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider, isConfigured } from "../config/firebase";
 
@@ -56,6 +56,16 @@ function persistSession(profile) {
 
 export function useAuth() {
   const [user, setUser] = useState(() => getSession());
+
+  // Backfill: when an existing localStorage user opens the app, sync them to
+  // the backend (upsert into Supabase, fires Sheets webhook on first time).
+  // Once-per-session via sessionStorage flag — doesn't spam the API on every render.
+  useEffect(() => {
+    if (!user) return;
+    if (sessionStorage.getItem("ks_backend_synced")) return;
+    notifyBackendSignup(user, user.provider || "phone");
+    sessionStorage.setItem("ks_backend_synced", "1");
+  }, [user]);
 
   // Register a new user by phone
   const register = useCallback(({ name, phone, lang }) => {
