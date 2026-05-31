@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   if (!userId) return res.status(401).json({ error: "missing_auth" });
 
   const SB_URL = process.env.SUPABASE_URL;
-  const SB_KEY = process.env.SUPABASE_SERVICE_KEY;
+  const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!SB_URL || !SB_KEY) {
     return res.status(200).json({ mode: "local_only", balance: 0, entriesToday: 0, entriesTotal: 0 });
   }

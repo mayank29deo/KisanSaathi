@@ -16,7 +16,7 @@
  *
  * Env vars required (Vercel):
  *   SUPABASE_URL
- *   SUPABASE_SERVICE_KEY (service-role key — bypasses RLS for backend writes)
+ *   SUPABASE_SERVICE_ROLE_KEY (service-role key — bypasses RLS for backend writes)
  */
 
 const VALID_COMMODITIES = new Set([
@@ -73,7 +73,7 @@ export default async function handler(req, res) {
 
   // ─── Supabase init ─────────────────────────────────────────
   const SB_URL = process.env.SUPABASE_URL;
-  const SB_KEY = process.env.SUPABASE_SERVICE_KEY;
+  const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!SB_URL || !SB_KEY) {
     // Supabase not configured yet — return placeholder success for dev/preview
     return res.status(200).json({

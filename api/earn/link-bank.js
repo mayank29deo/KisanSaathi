@@ -29,7 +29,7 @@ export default async function handler(req, res) {
   }
 
   const SB_URL = process.env.SUPABASE_URL;
-  const SB_KEY = process.env.SUPABASE_SERVICE_KEY;
+  const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const ENC_KEY = process.env.ENCRYPTION_KEY; // 32 bytes hex
 
   if (!SB_URL || !SB_KEY) {
