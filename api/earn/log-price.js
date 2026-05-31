@@ -157,14 +157,19 @@ export default async function handler(req, res) {
       key: idemKey, user_id: userId, response,
     });
 
-    // ─── Push to Google Sheets + email (fire-and-forget) ─────
-    pushToWebhook(SB_URL, SB_KEY, userId, {
-      type: "price_entry",
-      commodity, price, unit, sourceType,
-      state, district, pincode,
-      status, credit, flagReason,
-      timestamp: new Date().toISOString(),
-    }).catch((e) => console.error("webhook push failed:", e.message));
+    // ─── Push to Google Sheets + email (MUST await — Vercel kills
+    //     the function once response is sent, dropping any in-flight fetches)
+    try {
+      await pushToWebhook(SB_URL, SB_KEY, userId, {
+        type: "price_entry",
+        commodity, price, unit, sourceType,
+        state, district, pincode,
+        status, credit, flagReason,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.error("webhook push failed:", e.message);
+    }
 
     return res.status(200).json(response);
   } catch (err) {

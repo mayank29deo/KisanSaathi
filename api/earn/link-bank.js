@@ -56,14 +56,14 @@ export default async function handler(req, res) {
       verified: false,
     }, { Prefer: "resolution=merge-duplicates" });
 
-    // Notify admin via Sheets + email (fire-and-forget)
+    // Notify admin via Sheets + email — MUST await on Vercel serverless
     const webhookUrl = process.env.SHEETS_WEBHOOK_URL;
     if (webhookUrl) {
       try {
         const user = await sbCall(SB_URL, SB_KEY, "GET",
           `/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=name,phone,email`);
         const userInfo = user?.[0] || {};
-        fetch(webhookUrl, {
+        await fetch(webhookUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -78,8 +78,10 @@ export default async function handler(req, res) {
             hasAccountNumber: !!accountNumber,
             timestamp: new Date().toISOString(),
           }),
-        }).catch(() => {});
-      } catch {}
+        });
+      } catch (err) {
+        console.error("Webhook error:", err.message);
+      }
     }
 
     return res.status(200).json({ ok: true });
