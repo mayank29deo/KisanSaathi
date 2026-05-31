@@ -46,9 +46,10 @@ create table if not exists price_entries (
   verified_at     timestamptz
 );
 
--- Prevents same user logging same commodity in same district more than once per day
+-- Prevents same user logging same commodity in same district more than once per day.
+-- Note: timezone is pinned to UTC so the cast is IMMUTABLE (Postgres requirement for index expressions).
 create unique index if not exists uq_price_entry_per_day
-  on price_entries(user_id, commodity, district, (created_at::date));
+  on price_entries(user_id, commodity, district, ((created_at at time zone 'UTC')::date));
 
 create index if not exists idx_price_entries_district_commodity
   on price_entries(state, district, commodity, created_at desc);
@@ -199,7 +200,8 @@ begin
 
   select count(*) into v_today
     from price_entries
-    where user_id = p_user_id and created_at::date = current_date;
+    where user_id = p_user_id
+      and (created_at at time zone 'UTC')::date = (now() at time zone 'UTC')::date;
 
   select count(*) into v_total
     from price_entries where user_id = p_user_id;
