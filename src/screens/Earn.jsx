@@ -4,8 +4,40 @@ import Card from "../components/Card";
 import PrimaryButton from "../components/PrimaryButton";
 import { COMMODITIES, UNITS, SOURCE_TYPES, getCommodityName, getUnitLabel } from "../data/commodities";
 
-const STORAGE_KEY = "ks_earn_local";  // local cache used when API not yet wired
+const STORAGE_KEY = "ks_earn_local";  // local cache + offline fallback
 const DAILY_LIMIT = 30;
+
+// Fire-and-forget POST to /api/earn/log-price — Supabase persistence + Sheets sync + email.
+// Doesn't block UX. localStorage is the source of truth client-side; backend is for analytics/payouts.
+function notifyBackendPriceEntry(user, entry) {
+  try {
+    const userId = user?.provider === "google"
+      ? `google_${user.email || user.phone || ""}`
+      : user?.phone;
+    if (!userId) return;
+
+    fetch("/api/earn/log-price", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${userId}`,
+        "Idempotency-Key": entry.idemKey || crypto.randomUUID(),
+      },
+      body: JSON.stringify({
+        commodity: entry.commodity,
+        price: Number(entry.price),
+        unit: entry.unit,
+        sourceType: entry.sourceType,
+        state: entry.state || null,
+        district: entry.district,
+        pincode: entry.pincode || null,
+        lat: entry.lat || null,
+        lon: entry.lon || null,
+      }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {}
+}
 
 function getLocal() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { entries: [], balance: 0, bank: null, referralCode: null }; }
@@ -89,6 +121,7 @@ export default function Earn({ t, user }) {
     };
     setData(updated);
     saveLocal(updated);
+    notifyBackendPriceEntry(user, entry);
 
     if (status === "verified") {
       setToast({ type: "success", msg: t.earnSuccess });

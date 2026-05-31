@@ -5,6 +5,31 @@ import { auth, googleProvider, isConfigured } from "../config/firebase";
 const STORAGE_KEY = "ks_users";
 const SESSION_KEY = "ks_session";
 
+// Fire-and-forget POST to /api/signup so backend can record + notify (Sheets/email).
+// Does NOT block UX or affect auth result.
+function notifyBackendSignup(profile, providerOverride) {
+  try {
+    const id = profile.provider === "google"
+      ? `google_${profile.email || profile.phone || Date.now()}`
+      : profile.phone;
+
+    fetch("/api/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id,
+        name: profile.name,
+        phone: profile.phone || null,
+        email: profile.email || null,
+        provider: providerOverride || profile.provider || "phone",
+        photoURL: profile.photoURL || null,
+        lang: profile.lang || "en",
+      }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {}
+}
+
 function getUsers() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
@@ -51,6 +76,7 @@ export function useAuth() {
     saveUsers(users);
     persistSession(profile);
     setUser(profile);
+    notifyBackendSignup(profile, "phone");
     return { ok: true };
   }, []);
 
@@ -107,6 +133,7 @@ export function useAuth() {
       saveUsers(users);
       persistSession(profile);
       setUser(profile);
+      notifyBackendSignup(profile, "google");
       return { ok: true };
     } catch (err) {
       // User closed popup or other Firebase error

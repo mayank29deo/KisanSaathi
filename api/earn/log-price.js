@@ -157,10 +157,54 @@ export default async function handler(req, res) {
       key: idemKey, user_id: userId, response,
     });
 
+    // ─── Push to Google Sheets + email (fire-and-forget) ─────
+    pushToWebhook(SB_URL, SB_KEY, userId, {
+      type: "price_entry",
+      commodity, price, unit, sourceType,
+      state, district, pincode,
+      status, credit, flagReason,
+      timestamp: new Date().toISOString(),
+    }).catch((e) => console.error("webhook push failed:", e.message));
+
     return res.status(200).json(response);
   } catch (err) {
     return res.status(500).json({ error: "internal", detail: err.message });
   }
+}
+
+// Push price entry to Apps Script webhook for Sheets + email notification.
+// Enriches with user name + phone + total balance + bank info for easier payout tracking.
+async function pushToWebhook(sbUrl, sbKey, userId, payload) {
+  const webhookUrl = process.env.SHEETS_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  // Enrich with user info + current balance + bank
+  const [user, balanceRows, bank] = await Promise.all([
+    sb(sbUrl, sbKey, "GET", `/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=name,phone,email`),
+    sb(sbUrl, sbKey, "GET", `/rest/v1/earnings_ledger?user_id=eq.${encodeURIComponent(userId)}&select=amount`),
+    sb(sbUrl, sbKey, "GET", `/rest/v1/user_bank_accounts?user_id=eq.${encodeURIComponent(userId)}&select=upi_id,ifsc,account_holder`),
+  ]);
+
+  const userInfo = user?.[0] || {};
+  const balance = (balanceRows || []).reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  const bankInfo = bank?.[0] || {};
+
+  await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...payload,
+      userId,
+      userName: userInfo.name || "Unknown",
+      userPhone: userInfo.phone || "",
+      userEmail: userInfo.email || "",
+      totalBalance: balance,
+      bankUpi: bankInfo.upi_id || "",
+      bankIfsc: bankInfo.ifsc || "",
+      bankHolder: bankInfo.account_holder || "",
+      readyForPayout: balance >= 10 && !!(bankInfo.upi_id || bankInfo.ifsc),
+    }),
+  });
 }
 
 async function sb(url, key, method, path, body, extraHeaders) {

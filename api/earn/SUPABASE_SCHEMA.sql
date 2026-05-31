@@ -5,6 +5,27 @@
 
 -- ─── Tables ──────────────────────────────────────────────────
 
+-- Users — captures every signup (phone-based OR Google)
+create table if not exists users (
+  id              text primary key,            -- phone number (e.g. "9876543210") or "google_<uid>"
+  name            text not null,
+  phone           text,
+  email           text,
+  provider        text default 'phone',        -- 'phone' | 'google'
+  photo_url       text,
+  lang            text default 'en',           -- 'en' | 'hi' | 'bn'
+  role            text default 'farmer',       -- 'farmer' | 'admin' | 'team'
+  referral_code   text,
+  referred_by     text,
+  ip              text,
+  user_agent      text,
+  created_at      timestamptz default now(),
+  last_login      timestamptz default now()
+);
+
+create index if not exists idx_users_phone on users(phone);
+create index if not exists idx_users_email on users(email);
+
 create table if not exists price_entries (
   id              uuid primary key default gen_random_uuid(),
   user_id         text not null,
