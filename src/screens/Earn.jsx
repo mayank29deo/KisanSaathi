@@ -9,6 +9,32 @@ const DAILY_LIMIT = 30;
 
 // Fire-and-forget POST to /api/earn/log-price — Supabase persistence + Sheets sync + email.
 // Doesn't block UX. localStorage is the source of truth client-side; backend is for analytics/payouts.
+// Fire-and-forget POST to /api/earn/link-bank — stores UPI/IFSC in Supabase
+// so the Sheets webhook + admin emails can show "READY FOR PAYOUT" with bank info.
+function notifyBackendBankLink(user, bank) {
+  try {
+    const userId = user?.provider === "google"
+      ? `google_${user.email || user.phone || ""}`
+      : user?.phone;
+    if (!userId) return;
+
+    fetch("/api/earn/link-bank", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${userId}`,
+      },
+      body: JSON.stringify({
+        accountHolder: bank.accountHolder || null,
+        accountNumber: bank.accountNumber || null,
+        ifsc: bank.ifsc || null,
+        upiId: bank.upiId || null,
+      }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {}
+}
+
 function notifyBackendPriceEntry(user, entry) {
   try {
     const userId = user?.provider === "google"
@@ -139,6 +165,7 @@ export default function Earn({ t, user }) {
     saveLocal(updated);
     setShowBank(false);
     setToast({ type: "success", msg: t.earnBankLinked });
+    notifyBackendBankLink(user, bank);
   }
 
   function redeem() {

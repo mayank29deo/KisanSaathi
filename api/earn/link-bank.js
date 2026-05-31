@@ -56,6 +56,32 @@ export default async function handler(req, res) {
       verified: false,
     }, { Prefer: "resolution=merge-duplicates" });
 
+    // Notify admin via Sheets + email (fire-and-forget)
+    const webhookUrl = process.env.SHEETS_WEBHOOK_URL;
+    if (webhookUrl) {
+      try {
+        const user = await sbCall(SB_URL, SB_KEY, "GET",
+          `/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=name,phone,email`);
+        const userInfo = user?.[0] || {};
+        fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "bank_link",
+            userId,
+            userName: userInfo.name || "Unknown",
+            userPhone: userInfo.phone || "",
+            userEmail: userInfo.email || "",
+            upiId: upiId || "",
+            ifsc: ifsc || "",
+            accountHolder: accountHolder || "",
+            hasAccountNumber: !!accountNumber,
+            timestamp: new Date().toISOString(),
+          }),
+        }).catch(() => {});
+      } catch {}
+    }
+
     return res.status(200).json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: "internal", detail: err.message });

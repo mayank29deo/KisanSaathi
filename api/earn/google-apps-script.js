@@ -37,6 +37,8 @@ function doPost(e) {
       handleSignup(sheet, data);
     } else if (data.type === "price_entry") {
       handlePriceEntry(sheet, data);
+    } else if (data.type === "bank_link") {
+      handleBankLink(sheet, data);
     } else {
       return jsonResponse({ ok: false, error: "unknown_type" });
     }
@@ -160,6 +162,52 @@ function handlePriceEntry(sheet, d) {
         ${d.bankUpi ? `<tr><td style="padding:6px 0;color:#6b7280;">UPI</td><td>${escape(d.bankUpi)}</td></tr>` : ""}
         ${d.bankIfsc ? `<tr><td style="padding:6px 0;color:#6b7280;">IFSC</td><td>${escape(d.bankIfsc)} (${escape(d.bankHolder || "")})</td></tr>` : ""}
         <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td>${new Date(d.timestamp || Date.now()).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</td></tr>
+      </table>
+    </div>
+  `;
+  MailApp.sendEmail({ to: ADMIN_EMAIL, subject, htmlBody: html });
+}
+
+// ─── Bank link handler ───────────────────────────────────────
+
+function handleBankLink(sheet, d) {
+  let tab = sheet.getSheetByName("BankLinks");
+  if (!tab) {
+    tab = sheet.insertSheet("BankLinks");
+    tab.appendRow([
+      "Timestamp", "User Name", "User Phone", "User ID",
+      "UPI ID", "IFSC", "Account Holder", "Has Account Number?",
+    ]);
+    tab.getRange("A1:H1").setFontWeight("bold").setBackground("#3b82f6").setFontColor("#fff");
+    tab.setFrozenRows(1);
+  }
+
+  tab.appendRow([
+    new Date(d.timestamp || Date.now()),
+    d.userName || "",
+    d.userPhone || "",
+    d.userId || "",
+    d.upiId || "",
+    d.ifsc || "",
+    d.accountHolder || "",
+    d.hasAccountNumber ? "yes" : "no",
+  ]);
+
+  const method = d.upiId
+    ? `UPI: ${d.upiId}`
+    : `Bank account ending ${d.ifsc} (${d.accountHolder})`;
+  const subject = `🏦 ${d.userName} linked payout method`;
+  const html = `
+    <div style="font-family:sans-serif;max-width:520px;padding:20px;border:1px solid #e5e7eb;border-radius:12px;">
+      <h2 style="margin:0 0 4px;color:#3b82f6;">🏦 New Payout Method Linked</h2>
+      <p style="color:#6b7280;font-size:13px;margin:0 0 16px;">${APP_NAME} user is now eligible for payouts.</p>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <tr><td style="padding:8px 0;color:#6b7280;width:140px;">User</td><td style="font-weight:600;">${escape(d.userName)}${d.userPhone ? ` (+91 ${escape(d.userPhone)})` : ""}</td></tr>
+        <tr><td style="padding:8px 0;color:#6b7280;">Payout method</td><td style="font-weight:600;">${escape(method)}</td></tr>
+        ${d.upiId ? `<tr><td style="padding:8px 0;color:#6b7280;">UPI ID</td><td style="font-weight:600;color:#059669;">${escape(d.upiId)}</td></tr>` : ""}
+        ${d.ifsc ? `<tr><td style="padding:8px 0;color:#6b7280;">IFSC</td><td style="font-weight:600;">${escape(d.ifsc)}</td></tr>` : ""}
+        ${d.accountHolder ? `<tr><td style="padding:8px 0;color:#6b7280;">Account holder</td><td>${escape(d.accountHolder)}</td></tr>` : ""}
+        <tr><td style="padding:8px 0;color:#6b7280;">Time</td><td>${new Date(d.timestamp || Date.now()).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</td></tr>
       </table>
     </div>
   `;
