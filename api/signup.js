@@ -1,12 +1,14 @@
 /**
  * POST /api/signup
  * Called whenever a new user registers (phone+name OR Google sign-in).
- * - Inserts user into Supabase
+ * - Upserts user into Supabase
  * - Pushes to Google Apps Script webhook for Sheets + email notification
  *
  * Body: { id, name, phone?, email?, provider, photoURL?, lang, referredBy? }
  *
- * Idempotent: upserts on `id`. Safe to call on every login if needed.
+ * Concurrency: Atomically claims the webhook via UPDATE...WHERE webhook_signup_sent=false
+ * Only the request that successfully claims it fires the webhook (prevents double-emails
+ * from multi-tab or rapid double-render scenarios).
  */
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -21,20 +23,14 @@ export default async function handler(req, res) {
   const ip = req.headers["x-forwarded-for"]?.split(",")[0] || "";
   const userAgent = req.headers["user-agent"] || "";
 
-  // Detect if this is a brand-new signup vs returning login
-  let isNewSignup = true;
-
   const SB_URL = process.env.SUPABASE_URL;
   const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+  let shouldFireWebhook = false;
+
   if (SB_URL && SB_KEY) {
     try {
-      // Check if user exists
-      const exists = await sb(SB_URL, SB_KEY, "GET",
-        `/rest/v1/users?id=eq.${encodeURIComponent(id)}&select=id`);
-      isNewSignup = !exists?.length;
-
-      // Upsert user
+      // Upsert user — on insert webhook_signup_sent defaults to false; on update we don't touch it
       await sb(SB_URL, SB_KEY, "POST", `/rest/v1/users?on_conflict=id`, {
         id, name, phone: phone || null, email: email || null,
         provider: provider || "phone",
@@ -44,13 +40,24 @@ export default async function handler(req, res) {
         ip, user_agent: userAgent,
         last_login: new Date().toISOString(),
       }, { Prefer: "resolution=merge-duplicates" });
+
+      // Atomically claim the webhook lock — only one request will succeed
+      // PATCH returns the affected rows. If webhook_signup_sent was already true, this returns [].
+      const claimRes = await sb(SB_URL, SB_KEY, "PATCH",
+        `/rest/v1/users?id=eq.${encodeURIComponent(id)}&webhook_signup_sent=eq.false&select=id`,
+        { webhook_signup_sent: true },
+        { Prefer: "return=representation" }
+      );
+      shouldFireWebhook = Array.isArray(claimRes) && claimRes.length > 0;
     } catch (err) {
       console.error("Supabase signup error:", err.message);
     }
+  } else {
+    // Supabase not configured — fall through; webhook still won't fire without URL
+    shouldFireWebhook = true;
   }
 
-  // Push to Apps Script webhook ONLY for new signups (not every login)
-  if (isNewSignup) {
+  if (shouldFireWebhook) {
     const webhookUrl = process.env.SHEETS_WEBHOOK_URL;
     if (webhookUrl) {
       try {
@@ -73,7 +80,7 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.status(200).json({ ok: true, isNewSignup });
+  return res.status(200).json({ ok: true, firedWebhook: shouldFireWebhook });
 }
 
 async function sb(url, key, method, path, body, extra) {

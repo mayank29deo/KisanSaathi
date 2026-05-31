@@ -57,14 +57,17 @@ function persistSession(profile) {
 export function useAuth() {
   const [user, setUser] = useState(() => getSession());
 
-  // Backfill: when an existing localStorage user opens the app, sync them to
-  // the backend (upsert into Supabase, fires Sheets webhook on first time).
-  // Once-per-session via sessionStorage flag — doesn't spam the API on every render.
+  // Single source of truth for backend signup notification.
+  // Runs whenever `user` changes (register, login, Google sign-in, restored session).
+  // Per-user flag in localStorage ensures exactly-once per user per device —
+  // prevents the duplicate-email bug where explicit calls + useEffect both fired.
   useEffect(() => {
     if (!user) return;
-    if (sessionStorage.getItem("ks_backend_synced")) return;
+    const uid = user.phone || user.email || "anon";
+    const flagKey = `ks_synced_${uid}`;
+    if (localStorage.getItem(flagKey)) return;
     notifyBackendSignup(user, user.provider || "phone");
-    sessionStorage.setItem("ks_backend_synced", "1");
+    localStorage.setItem(flagKey, "1");
   }, [user]);
 
   // Register a new user by phone
@@ -86,7 +89,7 @@ export function useAuth() {
     saveUsers(users);
     persistSession(profile);
     setUser(profile);
-    notifyBackendSignup(profile, "phone");
+    // notifyBackendSignup fires from useEffect — don't double-call here
     return { ok: true };
   }, []);
 
@@ -143,7 +146,7 @@ export function useAuth() {
       saveUsers(users);
       persistSession(profile);
       setUser(profile);
-      notifyBackendSignup(profile, "google");
+      // notifyBackendSignup fires from useEffect — don't double-call here
       return { ok: true };
     } catch (err) {
       // User closed popup or other Firebase error

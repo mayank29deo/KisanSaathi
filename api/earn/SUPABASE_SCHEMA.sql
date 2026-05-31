@@ -7,21 +7,25 @@
 
 -- Users — captures every signup (phone-based OR Google)
 create table if not exists users (
-  id              text primary key,            -- phone number (e.g. "9876543210") or "google_<uid>"
-  name            text not null,
-  phone           text,
-  email           text,
-  provider        text default 'phone',        -- 'phone' | 'google'
-  photo_url       text,
-  lang            text default 'en',           -- 'en' | 'hi' | 'bn'
-  role            text default 'farmer',       -- 'farmer' | 'admin' | 'team'
-  referral_code   text,
-  referred_by     text,
-  ip              text,
-  user_agent      text,
-  created_at      timestamptz default now(),
-  last_login      timestamptz default now()
+  id                    text primary key,            -- phone number (e.g. "9876543210") or "google_<uid>"
+  name                  text not null,
+  phone                 text,
+  email                 text,
+  provider              text default 'phone',        -- 'phone' | 'google'
+  photo_url             text,
+  lang                  text default 'en',           -- 'en' | 'hi' | 'bn'
+  role                  text default 'farmer',       -- 'farmer' | 'admin' | 'team'
+  referral_code         text,
+  referred_by           text,
+  ip                    text,
+  user_agent            text,
+  webhook_signup_sent   boolean default false,       -- prevents duplicate signup emails (atomic lock)
+  created_at            timestamptz default now(),
+  last_login            timestamptz default now()
 );
+
+-- If you already created the users table without webhook_signup_sent, run this:
+alter table users add column if not exists webhook_signup_sent boolean default false;
 
 create index if not exists idx_users_phone on users(phone);
 create index if not exists idx_users_email on users(email);
