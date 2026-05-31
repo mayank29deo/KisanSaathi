@@ -30,6 +30,23 @@ function notifyBackendSignup(profile, providerOverride) {
   } catch {}
 }
 
+// Build a local user profile from a Supabase user row (used during
+// cross-device login restore).
+function profileFromBackend(u) {
+  return {
+    name: u.name || "User",
+    phone: u.phone || u.id || "",
+    email: u.email || "",
+    lang: u.lang || "en",
+    provider: u.provider || "phone",
+    photoURL: u.photo_url || null,
+    savedCrops: [],
+    savedLocation: null,
+    registeredAt: u.created_at || new Date().toISOString(),
+    lastLogin: new Date().toISOString(),
+  };
+}
+
 function getUsers() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
@@ -70,12 +87,27 @@ export function useAuth() {
     localStorage.setItem(flagKey, "1");
   }, [user]);
 
-  // Register a new user by phone
-  const register = useCallback(({ name, phone, lang }) => {
+  // Register a new user by phone. Async so we can also check the backend
+  // for cross-device duplicates (user signed up on another device already).
+  const register = useCallback(async ({ name, phone, lang }) => {
     const users = getUsers();
-    if (users[phone]) {
-      return { ok: false, error: "phone_exists" };
-    }
+    if (users[phone]) return { ok: false, error: "phone_exists" };
+
+    // Cross-device dup check via backend
+    try {
+      const r = await fetch(`/api/check-user?phone=${encodeURIComponent(phone)}`);
+      const data = await r.json();
+      if (data?.user) {
+        // Phone already registered on another device — auto-restore profile and log in
+        const restored = profileFromBackend(data.user);
+        users[phone] = restored;
+        saveUsers(users);
+        persistSession(restored);
+        setUser(restored);
+        return { ok: true, restored: true };
+      }
+    } catch {}
+
     const profile = {
       name: name.trim(),
       phone,
@@ -89,17 +121,29 @@ export function useAuth() {
     saveUsers(users);
     persistSession(profile);
     setUser(profile);
-    // notifyBackendSignup fires from useEffect — don't double-call here
     return { ok: true };
   }, []);
 
-  // Login existing user by phone
-  const login = useCallback((phone) => {
+  // Login existing user by phone. Async so we can fall back to the backend
+  // when the user signed up on a different device.
+  const login = useCallback(async (phone) => {
     const users = getUsers();
-    const profile = users[phone];
+    let profile = users[phone];
+
     if (!profile) {
-      return { ok: false, error: "not_found" };
+      // Fast path failed — try backend
+      try {
+        const r = await fetch(`/api/check-user?phone=${encodeURIComponent(phone)}`);
+        const data = await r.json();
+        if (data?.user) {
+          profile = profileFromBackend(data.user);
+          users[phone] = profile;
+        }
+      } catch {}
     }
+
+    if (!profile) return { ok: false, error: "not_found" };
+
     profile.lastLogin = new Date().toISOString();
     users[phone] = profile;
     saveUsers(users);

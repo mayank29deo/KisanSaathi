@@ -10,7 +10,7 @@ export default function AuthScreen({ onAuth, onGoogleSignIn, t }) {
   const [loading, setLoading] = useState(false);
   const [gLoading, setGLoading] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
 
@@ -26,10 +26,8 @@ export default function AuthScreen({ onAuth, onGoogleSignIn, t }) {
     }
 
     setLoading(true);
-    // Simulate async (keeps UX consistent if we wire real OTP later)
-    setTimeout(() => {
-      const result = onAuth(mode, { name, phone: cleanPhone, lang });
-      setLoading(false);
+    try {
+      const result = await onAuth(mode, { name, phone: cleanPhone, lang });
       if (!result.ok) {
         if (result.error === "phone_exists") {
           setError(t.authErrorExists || "Phone already registered. Please login instead.");
@@ -39,7 +37,11 @@ export default function AuthScreen({ onAuth, onGoogleSignIn, t }) {
           setError(t.authErrorGeneric || "Something went wrong. Please try again.");
         }
       }
-    }, 400);
+      // If result.restored is true, register found the user in backend and
+      // auto-logged them in — App.jsx will rerender into the main app.
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
