@@ -96,5 +96,6 @@ async function sbCall(url, key, method, path, body, extra) {
     headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", ...(extra || {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
-  return r.json();
+  const text = await r.text();
+  try { return JSON.parse(text); } catch { return text; }
 }
