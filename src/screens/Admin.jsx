@@ -78,10 +78,11 @@ export default function Admin() {
     });
     const j = await r.json();
     if (!r.ok) {
-      alert(`Failed: ${j.error || "unknown"}`);
+      alert(`Failed: ${j.error || "unknown"}${j.detail ? "\n\n" + JSON.stringify(j.detail) : ""}`);
       return;
     }
-    alert(`✓ Marked paid: ₹${j.amount} (payout ${j.payoutId.slice(0, 8)})`);
+    const tag = j.adopted ? "✓ Marked existing pending payout as paid" : "✓ Payout recorded";
+    alert(`${tag}: ₹${j.amount}\nRef: ${j.reference}`);
     fetchDashboard();
   }
 
@@ -353,12 +354,15 @@ function PayoutsTable({ rows, onMarkPaid, onLogManual }) {
                 <div className="flex justify-center gap-1">
                   <button
                     onClick={() => {
-                      const ref = prompt(`Confirm disbursal of ₹${p.payoutAmount} to ${p.name}.\n\nOptional NBFC reference / transaction ID:`);
-                      if (ref === null) return;
+                      const dest = p.upiId || p.ifsc;
+                      const ref = prompt(
+                        `You sent ₹${p.payoutAmount} to:\n\n${p.name} (+91 ${p.phone})\n${dest}\n\nEnter Transaction ID / UTR:`
+                      );
+                      if (ref === null) return; // cancelled
                       onMarkPaid(p.userId, ref);
                     }}
                     className="px-3 py-1 bg-emerald-600 text-white rounded-md text-xs font-semibold hover:bg-emerald-700"
-                    title="Auto-debit current balance (floored to ₹10 multiple)"
+                    title="Record this transfer — debits balance, adds to history"
                   >
                     Mark Paid ₹{p.payoutAmount}
                   </button>
