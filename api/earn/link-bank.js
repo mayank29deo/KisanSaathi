@@ -5,6 +5,7 @@
  * Body: { accountHolder, accountNumber, ifsc, upiId? }
  */
 import crypto from "node:crypto";
+import { sendAdminEmail, bankLinkEmail } from "../_email.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -56,32 +57,35 @@ export default async function handler(req, res) {
       verified: false,
     }, { Prefer: "resolution=merge-duplicates" });
 
-    // Notify admin via Sheets + email — MUST await on Vercel serverless
-    const webhookUrl = process.env.SHEETS_WEBHOOK_URL;
-    if (webhookUrl) {
-      try {
-        const user = await sbCall(SB_URL, SB_KEY, "GET",
-          `/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=name,phone,email`);
-        const userInfo = user?.[0] || {};
-        await fetch(webhookUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "bank_link",
-            userId,
-            userName: userInfo.name || "Unknown",
-            userPhone: userInfo.phone || "",
-            userEmail: userInfo.email || "",
-            upiId: upiId || "",
-            ifsc: ifsc || "",
-            accountHolder: accountHolder || "",
-            hasAccountNumber: !!accountNumber,
-            timestamp: new Date().toISOString(),
-          }),
-        });
-      } catch (err) {
-        console.error("Webhook error:", err.message);
-      }
+    // Notify admin via Sheets (Apps Script) + Resend email.
+    // Both fire in parallel; failures in either don't break the response.
+    try {
+      const user = await sbCall(SB_URL, SB_KEY, "GET",
+        `/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=name,phone,email`);
+      const userInfo = user?.[0] || {};
+      const payload = {
+        type: "bank_link",
+        userId,
+        userName: userInfo.name || "Unknown",
+        userPhone: userInfo.phone || "",
+        userEmail: userInfo.email || "",
+        upiId: upiId || "",
+        ifsc: ifsc || "",
+        accountHolder: accountHolder || "",
+        hasAccountNumber: !!accountNumber,
+        timestamp: new Date().toISOString(),
+      };
+      const webhookUrl = process.env.SHEETS_WEBHOOK_URL;
+      const sheetCall = webhookUrl
+        ? fetch(webhookUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : Promise.resolve();
+      await Promise.allSettled([sheetCall, sendAdminEmail(bankLinkEmail(payload))]);
+    } catch (err) {
+      console.error("Notify error:", err.message);
     }
 
     return res.status(200).json({ ok: true });

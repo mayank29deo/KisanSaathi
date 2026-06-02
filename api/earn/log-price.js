@@ -17,7 +17,9 @@
  * Env vars required (Vercel):
  *   SUPABASE_URL
  *   SUPABASE_SERVICE_ROLE_KEY (service-role key — bypasses RLS for backend writes)
+ *   RESEND_API_KEY            (admin email notifications)
  */
+import { sendAdminEmail, priceEntryEmail } from "../_email.js";
 
 const VALID_COMMODITIES = new Set([
   "onion","tomato","potato","garlic","ginger","carrot","cauliflower","cabbage","brinjal","okra",
@@ -177,11 +179,10 @@ export default async function handler(req, res) {
   }
 }
 
-// Push price entry to Apps Script webhook for Sheets + email notification.
+// Push price entry to Apps Script webhook (Sheets) + Resend (email).
 // Enriches with user name + phone + total balance + bank info for easier payout tracking.
 async function pushToWebhook(sbUrl, sbKey, userId, payload) {
   const webhookUrl = process.env.SHEETS_WEBHOOK_URL;
-  if (!webhookUrl) return;
 
   // Enrich with user info + current balance + bank
   const [user, balanceRows, bank] = await Promise.all([
@@ -194,22 +195,29 @@ async function pushToWebhook(sbUrl, sbKey, userId, payload) {
   const balance = (balanceRows || []).reduce((sum, r) => sum + Number(r.amount || 0), 0);
   const bankInfo = bank?.[0] || {};
 
-  await fetch(webhookUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      ...payload,
-      userId,
-      userName: userInfo.name || "Unknown",
-      userPhone: userInfo.phone || "",
-      userEmail: userInfo.email || "",
-      totalBalance: balance,
-      bankUpi: bankInfo.upi_id || "",
-      bankIfsc: bankInfo.ifsc || "",
-      bankHolder: bankInfo.account_holder || "",
-      readyForPayout: balance >= 10 && !!(bankInfo.upi_id || bankInfo.ifsc),
-    }),
-  });
+  const enriched = {
+    ...payload,
+    userId,
+    userName: userInfo.name || "Unknown",
+    userPhone: userInfo.phone || "",
+    userEmail: userInfo.email || "",
+    totalBalance: balance,
+    bankUpi: bankInfo.upi_id || "",
+    bankIfsc: bankInfo.ifsc || "",
+    bankHolder: bankInfo.account_holder || "",
+    readyForPayout: balance >= 10 && !!(bankInfo.upi_id || bankInfo.ifsc),
+  };
+
+  // Fire sheet append + Resend email in parallel — neither blocks the other.
+  // Each is optional: sheet skipped if SHEETS_WEBHOOK_URL unset, email skipped if RESEND_API_KEY unset.
+  const sheetCall = webhookUrl
+    ? fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(enriched),
+      })
+    : Promise.resolve();
+  await Promise.allSettled([sheetCall, sendAdminEmail(priceEntryEmail(enriched))]);
 }
 
 async function sb(url, key, method, path, body, extraHeaders) {

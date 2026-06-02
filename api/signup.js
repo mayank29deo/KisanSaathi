@@ -2,14 +2,17 @@
  * POST /api/signup
  * Called whenever a new user registers (phone+name OR Google sign-in).
  * - Upserts user into Supabase
- * - Pushes to Google Apps Script webhook for Sheets + email notification
+ * - Pushes to Google Apps Script webhook for Sheets row append
+ * - Sends admin email via Resend
  *
  * Body: { id, name, phone?, email?, provider, photoURL?, lang, referredBy? }
  *
  * Concurrency: Atomically claims the webhook via UPDATE...WHERE webhook_signup_sent=false
- * Only the request that successfully claims it fires the webhook (prevents double-emails
- * from multi-tab or rapid double-render scenarios).
+ * Only the request that successfully claims it fires the webhook/email
+ * (prevents double-emails from multi-tab or rapid double-render scenarios).
  */
+import { sendAdminEmail, signupEmail } from "./_email.js";
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -58,29 +61,46 @@ export default async function handler(req, res) {
   }
 
   if (shouldFireWebhook) {
-    const webhookUrl = process.env.SHEETS_WEBHOOK_URL;
-    if (webhookUrl) {
-      try {
-        await fetch(webhookUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "signup",
-            id, name,
-            phone: phone || "",
-            email: email || "",
-            provider: provider || "phone",
-            lang: lang || "en",
-            timestamp: new Date().toISOString(),
-          }),
-        });
-      } catch (err) {
-        console.error("Webhook error:", err.message);
-      }
-    }
+    const payload = {
+      type: "signup",
+      id, name,
+      phone: phone || "",
+      email: email || "",
+      provider: provider || "phone",
+      lang: lang || "en",
+      timestamp: new Date().toISOString(),
+    };
+
+    // Fire sheet webhook + email in parallel — neither blocks the other.
+    await Promise.allSettled([
+      pushSheet(payload),
+      pushEmail(payload),
+    ]);
   }
 
   return res.status(200).json({ ok: true, firedWebhook: shouldFireWebhook });
+}
+
+async function pushSheet(payload) {
+  const webhookUrl = process.env.SHEETS_WEBHOOK_URL;
+  if (!webhookUrl) return;
+  try {
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    console.error("Sheet webhook error:", err.message);
+  }
+}
+
+async function pushEmail(payload) {
+  try {
+    await sendAdminEmail(signupEmail(payload));
+  } catch (err) {
+    console.error("Email send error:", err.message);
+  }
 }
 
 async function sb(url, key, method, path, body, extra) {
