@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import STRINGS from "./i18n/strings";
 import { useAuth } from "./hooks/useAuth";
 
@@ -75,6 +76,7 @@ function ConsumerApp() {
           onGoogleSignIn={signInWithGoogle}
         />
         <Analytics />
+        <SpeedInsights />
       </>
     );
   }
@@ -162,6 +164,7 @@ function ConsumerApp() {
       </AnimatePresence>
 
       <Analytics />
+      <SpeedInsights />
     </div>
   );
 }
