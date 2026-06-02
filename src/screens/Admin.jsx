@@ -1,8 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { signInWithPopup, signOut } from "firebase/auth";
 import { auth, googleProvider, isConfigured } from "../config/firebase";
-
-const ADMIN_EMAILS = ["mayank29deo@gmail.com"];
+import { isAdminEmail } from "../config/adminEmails";
 
 export default function Admin() {
   const [fbUser, setFbUser] = useState(null);
@@ -20,7 +19,7 @@ export default function Admin() {
     return unsub;
   }, []);
 
-  const isAdmin = fbUser && ADMIN_EMAILS.includes(fbUser.email);
+  const isAdmin = isAdminEmail(fbUser?.email);
 
   const fetchDashboard = useCallback(async () => {
     if (!fbUser) return;

@@ -19,6 +19,9 @@ import Admin from "./screens/Admin";
 // Components
 import TabButton from "./components/TabButton";
 
+// Config
+import { isAdminEmail } from "./config/adminEmails";
+
 const LANG_KEY = "ks_lang";
 
 export default function App() {
@@ -258,6 +261,17 @@ function ProfileModal({ user, t, lang, onLangChange, onUpdate, onLogout, onClose
               <option value="bn">বাংলা</option>
             </select>
           </div>
+
+          {/* Admin shortcut — only renders for allowlisted emails */}
+          {isAdminEmail(user.email) && (
+            <a
+              href="/admin"
+              className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-semibold py-3 rounded-xl text-sm active:scale-95 transition-transform flex items-center justify-center gap-2 mt-2"
+            >
+              <span>⚙️</span>
+              <span>Open Admin Dashboard</span>
+            </a>
+          )}
 
           {/* Logout */}
           <button
