@@ -11,6 +11,7 @@ export default function Admin() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("payouts");
+  const [logModalUser, setLogModalUser] = useState(null); // user being logged for, null = closed
 
   // Listen for auth state changes
   useEffect(() => {
@@ -83,6 +84,22 @@ export default function Admin() {
     }
     alert(`✓ Marked paid: ₹${j.amount} (payout ${j.payoutId.slice(0, 8)})`);
     fetchDashboard();
+  }
+
+  async function logPayout({ userId, amount, method, reference, transferDate }) {
+    const token = await fbUser.getIdToken();
+    const r = await fetch("/api/admin/log-payout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ userId, amount, method, reference, transferDate }),
+    });
+    const j = await r.json();
+    if (!r.ok) {
+      alert(`Failed: ${j.error || "unknown"}`);
+      return false;
+    }
+    fetchDashboard();
+    return true;
   }
 
   async function reviewEntry(entryId, action) {
@@ -194,7 +211,7 @@ export default function Admin() {
 
       {/* Stats banner */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
           <StatCard label="Total Users" value={stats.totalUsers} />
           <StatCard label="Active Today" value={stats.activeToday} accent="emerald" />
           <StatCard label="Entries Today" value={stats.totalEntriesToday} />
@@ -205,6 +222,12 @@ export default function Admin() {
             accent="emerald-dark"
             highlight
           />
+          <StatCard
+            label="Disbursed All-Time"
+            value={`₹${stats.totalDisbursedAllTime || 0}`}
+            accent="emerald-dark"
+            sub={`${stats.totalPayoutCount || 0} payouts`}
+          />
           <StatCard label="Flagged" value={stats.flaggedCount} accent={stats.flaggedCount ? "red" : null} />
           <StatCard label="DB Time" value={new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour12: false }).slice(0, 5)} />
         </div>
@@ -213,6 +236,9 @@ export default function Admin() {
         <div className="mt-6 border-b border-gray-200 flex gap-1 overflow-x-auto">
           <TabBtn active={tab === "payouts"} onClick={() => setTab("payouts")} count={data?.payoutsReady?.length}>
             🪙 Payouts Ready
+          </TabBtn>
+          <TabBtn active={tab === "history"} onClick={() => setTab("history")} count={data?.payoutHistory?.length}>
+            📜 Payout History
           </TabBtn>
           <TabBtn active={tab === "users"} onClick={() => setTab("users")} count={data?.users?.length}>
             👥 Users
@@ -227,19 +253,31 @@ export default function Admin() {
 
         {/* Tab content */}
         <div className="mt-4">
-          {tab === "payouts" && <PayoutsTable rows={data?.payoutsReady || []} onMarkPaid={markPaid} />}
-          {tab === "users" && <UsersTable rows={data?.users || []} />}
+          {tab === "payouts" && <PayoutsTable rows={data?.payoutsReady || []} onMarkPaid={markPaid} onLogManual={(u) => setLogModalUser(u)} />}
+          {tab === "history" && <HistoryTable rows={data?.payoutHistory || []} />}
+          {tab === "users" && <UsersTable rows={data?.users || []} onLogManual={(u) => setLogModalUser(u)} />}
           {tab === "entries" && <EntriesTable rows={data?.recentEntries || []} />}
           {tab === "flagged" && <FlaggedTable rows={data?.flagged || []} onReview={reviewEntry} />}
         </div>
       </div>
+
+      {logModalUser && (
+        <LogPayoutModal
+          user={logModalUser}
+          onClose={() => setLogModalUser(null)}
+          onSubmit={async (vals) => {
+            const ok = await logPayout({ userId: logModalUser.userId, ...vals });
+            if (ok) setLogModalUser(null);
+          }}
+        />
+      )}
     </div>
   );
 }
 
 // ─── Subcomponents ─────────────────────────────────────────────
 
-function StatCard({ label, value, accent, highlight }) {
+function StatCard({ label, value, accent, highlight, sub }) {
   const accentClass = {
     emerald: "text-emerald-600",
     "emerald-dark": "text-emerald-700",
@@ -250,6 +288,7 @@ function StatCard({ label, value, accent, highlight }) {
     <div className={`bg-white rounded-xl p-3 border ${highlight ? "border-emerald-300 ring-2 ring-emerald-100" : "border-gray-200"}`}>
       <div className="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">{label}</div>
       <div className={`text-lg font-bold mt-0.5 ${accentClass}`}>{value ?? 0}</div>
+      {sub && <div className="text-[11px] text-gray-400 mt-0.5">{sub}</div>}
     </div>
   );
 }
@@ -274,19 +313,21 @@ function TabBtn({ active, onClick, count, children, red }) {
   );
 }
 
-function PayoutsTable({ rows, onMarkPaid }) {
+function PayoutsTable({ rows, onMarkPaid, onLogManual }) {
   if (rows.length === 0) {
     return <EmptyState icon="🪙" title="No payouts ready" subtitle="When a user crosses ₹10 with a linked bank/UPI, they'll appear here." />;
   }
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-gray-50 border-b border-gray-200">
           <tr className="text-left text-xs font-semibold text-gray-600 uppercase">
             <Th>User</Th>
             <Th>Phone</Th>
+            <Th>Location</Th>
             <Th align="right">Balance</Th>
             <Th align="right">Disburse</Th>
+            <Th align="right">Paid Lifetime</Th>
             <Th>UPI / Bank</Th>
             <Th>Holder</Th>
             <Th align="center">Action</Th>
@@ -297,8 +338,10 @@ function PayoutsTable({ rows, onMarkPaid }) {
             <tr key={p.userId} className="border-b border-gray-100 hover:bg-emerald-50/40">
               <Td className="font-semibold">{p.name}</Td>
               <Td>{p.phone ? `+91 ${p.phone}` : "—"}</Td>
+              <Td className="text-gray-600 text-xs">{p.district || "—"}{p.state ? `, ${p.state}` : ""}</Td>
               <Td align="right" className="font-semibold">₹{p.balance}</Td>
               <Td align="right" className="font-bold text-emerald-700">₹{p.payoutAmount}</Td>
+              <Td align="right" className="text-gray-600">₹{p.lifetimeDisbursed || 0}</Td>
               <Td>
                 {p.upiId ? (
                   <span className="font-mono text-emerald-700">{p.upiId}</span>
@@ -316,8 +359,20 @@ function PayoutsTable({ rows, onMarkPaid }) {
                       onMarkPaid(p.userId, ref);
                     }}
                     className="px-3 py-1 bg-emerald-600 text-white rounded-md text-xs font-semibold hover:bg-emerald-700"
+                    title="Auto-debit current balance (floored to ₹10 multiple)"
                   >
                     Mark Paid ₹{p.payoutAmount}
+                  </button>
+                  <button
+                    onClick={() => onLogManual({
+                      userId: p.userId, name: p.name, phone: p.phone,
+                      upiId: p.upiId, ifsc: p.ifsc, accountHolder: p.accountHolder,
+                      defaultAmount: p.payoutAmount,
+                    })}
+                    className="px-2 py-1 bg-white border border-gray-300 text-gray-700 rounded-md text-xs font-semibold hover:bg-gray-50"
+                    title="Log a manual/retroactive transfer"
+                  >
+                    + Log
                   </button>
                 </div>
               </Td>
@@ -329,21 +384,22 @@ function PayoutsTable({ rows, onMarkPaid }) {
   );
 }
 
-function UsersTable({ rows }) {
+function UsersTable({ rows, onLogManual }) {
   const [search, setSearch] = useState("");
   const filtered = rows.filter((u) => {
     if (!search) return true;
     const s = search.toLowerCase();
     return (u.name || "").toLowerCase().includes(s)
       || (u.phone || "").includes(s)
-      || (u.email || "").toLowerCase().includes(s);
+      || (u.email || "").toLowerCase().includes(s)
+      || (u.district || "").toLowerCase().includes(s);
   });
   return (
     <div>
       <input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search by name, phone, email…"
+        placeholder="Search by name, phone, email, location…"
         className="w-full px-3 py-2 mb-3 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
       />
       <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
@@ -352,11 +408,13 @@ function UsersTable({ rows }) {
             <tr className="text-left text-xs font-semibold text-gray-600 uppercase">
               <Th>Name</Th>
               <Th>Phone</Th>
-              <Th>Email</Th>
+              <Th>Location</Th>
               <Th>Provider</Th>
-              <Th align="right">Balance</Th>
-              <Th>Bank</Th>
+              <Th align="right">Balance Owed</Th>
+              <Th align="right">Paid Lifetime</Th>
+              <Th>Bank / UPI</Th>
               <Th>Joined</Th>
+              <Th align="center">Action</Th>
             </tr>
           </thead>
           <tbody>
@@ -364,21 +422,34 @@ function UsersTable({ rows }) {
               <tr key={u.userId} className="border-b border-gray-100 hover:bg-gray-50">
                 <Td className="font-medium">{u.name}</Td>
                 <Td>{u.phone ? `+91 ${u.phone}` : "—"}</Td>
-                <Td className="text-gray-600">{u.email || "—"}</Td>
+                <Td className="text-gray-600 text-xs">{u.district || "—"}{u.state ? `, ${u.state}` : ""}</Td>
                 <Td>{u.provider === "google" ? "🟦 Google" : "📱 Phone"}</Td>
                 <Td align="right" className={u.balance >= 10 ? "font-bold text-emerald-700" : ""}>₹{u.balance}</Td>
+                <Td align="right" className="text-gray-600">₹{u.lifetimeDisbursed || 0}</Td>
                 <Td>
                   {u.bankLinked ? (
-                    <span className="text-emerald-600 text-xs font-semibold">✓ {u.bankUpi || u.bankIfsc}</span>
+                    <span className="text-emerald-600 text-xs font-mono">{u.bankUpi || u.bankIfsc}</span>
                   ) : (
                     <span className="text-gray-400 text-xs">—</span>
                   )}
                 </Td>
                 <Td className="text-gray-500 text-xs">{fmtDate(u.createdAt)}</Td>
+                <Td align="center">
+                  <button
+                    onClick={() => onLogManual({
+                      userId: u.userId, name: u.name, phone: u.phone,
+                      upiId: u.bankUpi, ifsc: u.bankIfsc, accountHolder: u.bankHolder,
+                      defaultAmount: u.balance >= 10 ? Math.floor(u.balance / 10) * 10 : 0,
+                    })}
+                    className="px-2 py-1 bg-white border border-gray-300 text-gray-700 rounded text-xs font-semibold hover:bg-gray-50"
+                  >
+                    + Log Transfer
+                  </button>
+                </Td>
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><Td colSpan={7} className="text-center text-gray-400 py-8">No matches</Td></tr>
+              <tr><Td colSpan={9} className="text-center text-gray-400 py-8">No matches</Td></tr>
             )}
           </tbody>
         </table>
@@ -493,6 +564,233 @@ function FlaggedTable({ rows, onReview }) {
   );
 }
 
+function HistoryTable({ rows }) {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const filtered = rows.filter((p) => {
+    if (statusFilter !== "all" && p.status !== statusFilter) return false;
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return (p.userName || "").toLowerCase().includes(s)
+      || (p.userPhone || "").includes(s)
+      || (p.nbfcRef || "").toLowerCase().includes(s)
+      || (p.district || "").toLowerCase().includes(s);
+  });
+
+  // Total disbursed in the filtered view
+  const totalShown = filtered.filter((p) => p.status === "completed").reduce((s, p) => s + p.amount, 0);
+
+  if (rows.length === 0) {
+    return <EmptyState icon="📜" title="No payouts yet" subtitle="Once you mark someone paid or log a manual transfer, it'll appear here." />;
+  }
+
+  return (
+    <div>
+      <div className="flex flex-col sm:flex-row gap-2 mb-3">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name, phone, location, transaction ref…"
+          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+        />
+        <div className="flex gap-1 flex-wrap">
+          {["all", "completed", "pending", "processing", "failed"].map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-3 py-1 rounded-full text-xs font-medium capitalize whitespace-nowrap ${
+                statusFilter === s ? "bg-emerald-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-3 text-sm">
+        <span className="text-emerald-800 font-semibold">
+          ₹{totalShown.toLocaleString("en-IN")} disbursed
+        </span>
+        <span className="text-emerald-600 ml-2">
+          across {filtered.filter((p) => p.status === "completed").length} payouts in view
+        </span>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr className="text-left text-xs font-semibold text-gray-600 uppercase">
+              <Th>Date</Th>
+              <Th>User</Th>
+              <Th>Phone</Th>
+              <Th>Location</Th>
+              <Th align="right">Amount</Th>
+              <Th>Method</Th>
+              <Th>Destination</Th>
+              <Th>Reference</Th>
+              <Th>Status</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((p) => (
+              <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <Td className="text-xs whitespace-nowrap">{fmtDateTime(p.completedAt || p.requestedAt)}</Td>
+                <Td className="font-medium">{p.userName}</Td>
+                <Td>{p.userPhone ? `+91 ${p.userPhone}` : "—"}</Td>
+                <Td className="text-gray-600 text-xs">{p.district || "—"}{p.state ? `, ${p.state}` : ""}</Td>
+                <Td align="right" className="font-bold text-emerald-700">₹{p.amount}</Td>
+                <Td className="capitalize text-xs">{p.method}</Td>
+                <Td className="font-mono text-xs">{p.upiId || p.ifsc || "—"}</Td>
+                <Td className="font-mono text-[11px] text-gray-500 truncate max-w-[160px]" title={p.nbfcRef}>
+                  {p.nbfcRef || "—"}
+                </Td>
+                <Td><PayoutStatusBadge status={p.status} reason={p.failureReason} /></Td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr><Td colSpan={9} className="text-center text-gray-400 py-8">No matches</Td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function LogPayoutModal({ user, onClose, onSubmit }) {
+  const [amount, setAmount] = useState(user.defaultAmount > 0 ? String(user.defaultAmount) : "");
+  const [method, setMethod] = useState(user.upiId ? "upi" : user.ifsc ? "bank" : "upi");
+  const [reference, setReference] = useState("");
+  const [transferDate, setTransferDate] = useState(new Date().toISOString().slice(0, 16));
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit() {
+    const amt = Number(amount);
+    if (!amt || amt <= 0) return alert("Enter a valid amount");
+    setSubmitting(true);
+    await onSubmit({ amount: amt, method, reference: reference.trim(), transferDate: new Date(transferDate).toISOString() });
+    setSubmitting(false);
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 pointer-events-auto">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-emerald-700">Log Manual Transfer</h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {user.name} {user.phone ? `(+91 ${user.phone})` : ""}
+            </p>
+          </div>
+
+          {/* Pre-filled destination context */}
+          {(user.upiId || user.ifsc) && (
+            <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm">
+              <div className="text-xs text-gray-500 mb-1">Linked payout method:</div>
+              {user.upiId && <div className="font-mono text-emerald-700">UPI: {user.upiId}</div>}
+              {user.ifsc && <div className="font-mono">{user.ifsc} ({user.accountHolder})</div>}
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Amount (₹)</label>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                placeholder="e.g. 50"
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Method</label>
+              <div className="grid grid-cols-4 gap-1">
+                {[
+                  { v: "upi", l: "UPI" },
+                  { v: "bank", l: "Bank" },
+                  { v: "mobile", l: "Mobile" },
+                  { v: "other", l: "Other" },
+                ].map((m) => (
+                  <button
+                    key={m.v}
+                    onClick={() => setMethod(m.v)}
+                    className={`py-2 rounded-lg text-xs font-semibold ${
+                      method === m.v ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {m.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">
+                Transaction ID / UTR / Reference
+              </label>
+              <input
+                type="text"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                placeholder="e.g. UTR123456789"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">
+                Transfer Date / Time
+              </label>
+              <input
+                type="datetime-local"
+                value={transferDate}
+                onChange={(e) => setTransferDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2 mt-6">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-semibold text-gray-700"
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {submitting ? "Logging…" : `Log ₹${amount || "?"}`}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function PayoutStatusBadge({ status, reason }) {
+  const cls = {
+    completed: "bg-emerald-100 text-emerald-700",
+    pending: "bg-amber-100 text-amber-700",
+    processing: "bg-blue-100 text-blue-700",
+    failed: "bg-red-100 text-red-700",
+  }[status] || "bg-gray-100 text-gray-700";
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${cls}`} title={reason}>
+      {status}
+    </span>
+  );
+}
+
 function StatusBadge({ status, reason }) {
   const cls = {
     verified: "bg-emerald-100 text-emerald-700",
@@ -536,4 +834,12 @@ function fmtTime(iso) {
   return sameDay
     ? d.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false })
     : d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+function fmtDateTime(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "numeric", month: "short", year: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  });
 }

@@ -2,11 +2,12 @@
  * GET /api/admin/dashboard
  *
  * Returns everything the admin UI needs in one round-trip:
- *  - stats   : top-line counters
- *  - payoutsReady : users with balance ≥ ₹10 AND bank linked
- *  - flagged : flagged price entries needing review
- *  - recentEntries : last 100 price entries (any status)
- *  - users   : all users with balance + bank status + last activity
+ *  - stats         : top-line counters
+ *  - payoutsReady  : users with balance ≥ ₹10 AND bank linked
+ *  - flagged       : flagged price entries needing review
+ *  - recentEntries : last 200 price entries (any status)
+ *  - users         : all users with balance, lifetime disbursed, bank, location
+ *  - payoutHistory : completed/pending payouts, newest first
  *
  * Requires admin Firebase ID token in Authorization: Bearer header.
  */
@@ -23,13 +24,17 @@ export default async function handler(req, res) {
   if (!guard.ok) return res.status(guard.status).json({ error: guard.error });
 
   try {
-    // Fetch all the tables in parallel — fast and stays well under the 10s function timeout
-    const [users, ledger, banks, recentEntries, flagged] = await Promise.all([
+    // Fetch all the tables in parallel — fast and stays well under the 10s function timeout.
+    // entriesForLocation has a higher limit because we use it to derive each user's
+    // most recent district/state (location). recentEntries is the UI feed.
+    const [users, ledger, banks, recentEntries, flagged, payouts, entriesForLocation] = await Promise.all([
       sb("/rest/v1/users?select=id,name,phone,email,provider,lang,created_at,last_login&order=created_at.desc&limit=2000"),
       sb("/rest/v1/earnings_ledger?select=user_id,amount"),
       sb("/rest/v1/user_bank_accounts?select=user_id,account_holder,ifsc,upi_id,verified,updated_at"),
       sb("/rest/v1/price_entries?select=id,user_id,commodity,price,unit,source_type,state,district,status,flagged_reason,created_at&order=created_at.desc&limit=200"),
       sb("/rest/v1/price_entries?status=eq.flagged&select=id,user_id,commodity,price,unit,source_type,state,district,flagged_reason,created_at&order=created_at.desc&limit=100"),
+      sb("/rest/v1/payout_requests?select=id,user_id,amount,status,nbfc_ref,failure_reason,requested_at,completed_at&order=requested_at.desc&limit=500"),
+      sb("/rest/v1/price_entries?select=user_id,state,district,created_at&order=created_at.desc&limit=2000"),
     ]);
 
     // Build per-user balance lookup
@@ -42,6 +47,26 @@ export default async function handler(req, res) {
     const bankByUser = {};
     for (const b of banks || []) {
       bankByUser[b.user_id] = b;
+    }
+
+    // Lifetime disbursed per user (sum of completed payouts)
+    const lifetimeDisbursedByUser = {};
+    const pendingPayoutByUser = {};
+    for (const p of payouts || []) {
+      if (p.status === "completed") {
+        lifetimeDisbursedByUser[p.user_id] = (lifetimeDisbursedByUser[p.user_id] || 0) + Number(p.amount || 0);
+      } else if (p.status === "pending" || p.status === "processing") {
+        pendingPayoutByUser[p.user_id] = (pendingPayoutByUser[p.user_id] || 0) + Number(p.amount || 0);
+      }
+    }
+
+    // Most recent location (district + state) per user, derived from entriesForLocation.
+    // entries are ordered by created_at desc, so the first occurrence for a user IS the most recent.
+    const locationByUser = {};
+    for (const e of entriesForLocation || []) {
+      if (!locationByUser[e.user_id]) {
+        locationByUser[e.user_id] = { district: e.district || "", state: e.state || "" };
+      }
     }
 
     // Today (UTC) for "active today" count
@@ -66,6 +91,7 @@ export default async function handler(req, res) {
       const balance = balanceByUser[u.id] || 0;
       const bank = bankByUser[u.id];
       if (balance >= PAYOUT_MIN && bank && (bank.upi_id || bank.ifsc)) {
+        const loc = locationByUser[u.id] || {};
         payoutsReady.push({
           userId: u.id,
           name: u.name,
@@ -73,10 +99,13 @@ export default async function handler(req, res) {
           email: u.email,
           balance,
           payoutAmount: Math.floor(balance / 10) * 10,
+          lifetimeDisbursed: lifetimeDisbursedByUser[u.id] || 0,
           upiId: bank.upi_id || "",
           ifsc: bank.ifsc || "",
           accountHolder: bank.account_holder || "",
           bankUpdatedAt: bank.updated_at,
+          district: loc.district || "",
+          state: loc.state || "",
         });
       }
     }
@@ -86,6 +115,7 @@ export default async function handler(req, res) {
     const userRows = (users || []).map((u) => {
       const bal = balanceByUser[u.id] || 0;
       const bank = bankByUser[u.id];
+      const loc = locationByUser[u.id] || {};
       return {
         userId: u.id,
         name: u.name,
@@ -94,14 +124,42 @@ export default async function handler(req, res) {
         provider: u.provider,
         lang: u.lang,
         balance: bal,
+        lifetimeDisbursed: lifetimeDisbursedByUser[u.id] || 0,
+        pendingPayout: pendingPayoutByUser[u.id] || 0,
         bankLinked: !!bank,
         bankUpi: bank?.upi_id || "",
         bankIfsc: bank?.ifsc || "",
+        bankHolder: bank?.account_holder || "",
+        district: loc.district || "",
+        state: loc.state || "",
         createdAt: u.created_at,
         lastLogin: u.last_login,
       };
     });
     userRows.sort((a, b) => b.balance - a.balance);
+
+    // Build payout history list
+    const payoutHistory = (payouts || []).map((p) => {
+      const loc = locationByUser[p.user_id] || {};
+      const bank = bankByUser[p.user_id];
+      return {
+        id: p.id,
+        userId: p.user_id,
+        userName: userNameById[p.user_id] || "Unknown",
+        userPhone: userPhoneById[p.user_id] || "",
+        amount: Number(p.amount || 0),
+        status: p.status,
+        nbfcRef: p.nbfc_ref || "",
+        failureReason: p.failure_reason || "",
+        requestedAt: p.requested_at,
+        completedAt: p.completed_at,
+        district: loc.district || "",
+        state: loc.state || "",
+        method: p.nbfc_ref?.startsWith("manual_") ? (p.nbfc_ref.split("_")[1] || "manual") : (bank?.upi_id ? "upi" : bank?.ifsc ? "bank" : "manual"),
+        upiId: bank?.upi_id || "",
+        ifsc: bank?.ifsc || "",
+      };
+    });
 
     // Enrich entry rows with user name
     const enrichEntries = (rows) => (rows || []).map((e) => ({
@@ -120,6 +178,7 @@ export default async function handler(req, res) {
       createdAt: e.created_at,
     }));
 
+    const totalDisbursedAllTime = Object.values(lifetimeDisbursedByUser).reduce((s, v) => s + v, 0);
     const stats = {
       totalUsers: users?.length || 0,
       activeToday: activeTodaySet.size,
@@ -130,6 +189,8 @@ export default async function handler(req, res) {
       payoutsReadyCount: payoutsReady.length,
       payoutsReadyAmount: payoutsReady.reduce((s, p) => s + p.payoutAmount, 0),
       flaggedCount: flagged?.length || 0,
+      totalDisbursedAllTime,
+      totalPayoutCount: (payouts || []).filter((p) => p.status === "completed").length,
     };
 
     return res.status(200).json({
@@ -139,6 +200,7 @@ export default async function handler(req, res) {
       flagged: enrichEntries(flagged),
       recentEntries: enrichEntries(recentEntries),
       users: userRows,
+      payoutHistory,
     });
   } catch (err) {
     return res.status(500).json({ error: "internal", detail: err.message });
