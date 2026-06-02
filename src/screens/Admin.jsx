@@ -209,27 +209,39 @@ export default function Admin() {
         </div>
       </div>
 
-      {/* Stats banner */}
+      {/* Stats banner — each card click-jumps to the related tab */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-          <StatCard label="Total Users" value={stats.totalUsers} />
-          <StatCard label="Active Today" value={stats.activeToday} accent="emerald" />
-          <StatCard label="Entries Today" value={stats.totalEntriesToday} />
-          <StatCard label="Total Owed" value={`₹${stats.totalBalanceOwed || 0}`} accent="amber" />
+          <StatCard label="Total Users" value={stats.totalUsers} onClick={() => setTab("users")} />
+          <StatCard label="Active Today" value={stats.activeToday} accent="emerald" onClick={() => setTab("entries")} />
+          <StatCard label="Entries Today" value={stats.totalEntriesToday} onClick={() => setTab("entries")} />
+          <StatCard label="Total Owed" value={`₹${stats.totalBalanceOwed || 0}`} accent="amber" onClick={() => setTab("users")} />
           <StatCard
             label="Payouts Ready"
             value={`${stats.payoutsReadyCount} (₹${stats.payoutsReadyAmount || 0})`}
             accent="emerald-dark"
             highlight
+            onClick={() => setTab("payouts")}
           />
           <StatCard
             label="Disbursed All-Time"
             value={`₹${stats.totalDisbursedAllTime || 0}`}
             accent="emerald-dark"
             sub={`${stats.totalPayoutCount || 0} payouts`}
+            onClick={() => setTab("history")}
           />
-          <StatCard label="Flagged" value={stats.flaggedCount} accent={stats.flaggedCount ? "red" : null} />
-          <StatCard label="DB Time" value={new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour12: false }).slice(0, 5)} />
+          <StatCard
+            label="Bank Linked"
+            value={stats.bankLinkedCount}
+            accent="emerald"
+            onClick={() => setTab("banks")}
+          />
+          <StatCard
+            label="Flagged"
+            value={stats.flaggedCount}
+            accent={stats.flaggedCount ? "red" : null}
+            onClick={() => setTab("flagged")}
+          />
         </div>
 
         {/* Tabs */}
@@ -239,6 +251,9 @@ export default function Admin() {
           </TabBtn>
           <TabBtn active={tab === "history"} onClick={() => setTab("history")} count={data?.payoutHistory?.length}>
             📜 Payout History
+          </TabBtn>
+          <TabBtn active={tab === "banks"} onClick={() => setTab("banks")} count={data?.bankLinks?.length}>
+            🏦 Bank Links
           </TabBtn>
           <TabBtn active={tab === "users"} onClick={() => setTab("users")} count={data?.users?.length}>
             👥 Users
@@ -255,6 +270,7 @@ export default function Admin() {
         <div className="mt-4">
           {tab === "payouts" && <PayoutsTable rows={data?.payoutsReady || []} onMarkPaid={markPaid} onLogManual={(u) => setLogModalUser(u)} />}
           {tab === "history" && <HistoryTable rows={data?.payoutHistory || []} />}
+          {tab === "banks" && <BankLinksTable rows={data?.bankLinks || []} onLogManual={(u) => setLogModalUser(u)} />}
           {tab === "users" && <UsersTable rows={data?.users || []} onLogManual={(u) => setLogModalUser(u)} />}
           {tab === "entries" && <EntriesTable rows={data?.recentEntries || []} />}
           {tab === "flagged" && <FlaggedTable rows={data?.flagged || []} onReview={reviewEntry} />}
@@ -277,20 +293,27 @@ export default function Admin() {
 
 // ─── Subcomponents ─────────────────────────────────────────────
 
-function StatCard({ label, value, accent, highlight, sub }) {
+function StatCard({ label, value, accent, highlight, sub, onClick }) {
   const accentClass = {
     emerald: "text-emerald-600",
     "emerald-dark": "text-emerald-700",
     amber: "text-amber-600",
     red: "text-red-600",
   }[accent] || "text-gray-900";
-  return (
-    <div className={`bg-white rounded-xl p-3 border ${highlight ? "border-emerald-300 ring-2 ring-emerald-100" : "border-gray-200"}`}>
+  const baseCls = `bg-white rounded-xl p-3 border text-left w-full ${
+    highlight ? "border-emerald-300 ring-2 ring-emerald-100" : "border-gray-200"
+  } ${onClick ? "hover:border-emerald-400 hover:shadow-sm active:scale-[0.98] transition-all cursor-pointer" : ""}`;
+  const content = (
+    <>
       <div className="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">{label}</div>
       <div className={`text-lg font-bold mt-0.5 ${accentClass}`}>{value ?? 0}</div>
       {sub && <div className="text-[11px] text-gray-400 mt-0.5">{sub}</div>}
-    </div>
+    </>
   );
+  if (onClick) {
+    return <button onClick={onClick} className={baseCls}>{content}</button>;
+  }
+  return <div className={baseCls}>{content}</div>;
 }
 
 function TabBtn({ active, onClick, count, children, red }) {
@@ -563,6 +586,102 @@ function FlaggedTable({ rows, onReview }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function BankLinksTable({ rows, onLogManual }) {
+  const [search, setSearch] = useState("");
+  const filtered = rows.filter((b) => {
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return (b.userName || "").toLowerCase().includes(s)
+      || (b.userPhone || "").includes(s)
+      || (b.upiId || "").toLowerCase().includes(s)
+      || (b.ifsc || "").toLowerCase().includes(s)
+      || (b.accountHolder || "").toLowerCase().includes(s)
+      || (b.district || "").toLowerCase().includes(s);
+  });
+
+  if (rows.length === 0) {
+    return <EmptyState icon="🏦" title="No bank links yet" subtitle="Users who link UPI or bank details will appear here, just like the BankLinks sheet tab." />;
+  }
+
+  return (
+    <div>
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search by name, phone, UPI, IFSC, holder, location…"
+        className="w-full px-3 py-2 mb-3 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+      />
+
+      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-3 text-sm">
+        <span className="text-emerald-800 font-semibold">{filtered.length}</span>
+        <span className="text-emerald-700"> users with linked payout method</span>
+        <span className="text-emerald-600 ml-2">
+          ({filtered.filter((b) => b.upiId).length} UPI · {filtered.filter((b) => b.ifsc).length} Bank)
+        </span>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr className="text-left text-xs font-semibold text-gray-600 uppercase">
+              <Th>Linked</Th>
+              <Th>User Name</Th>
+              <Th>Phone</Th>
+              <Th>Location</Th>
+              <Th>UPI ID</Th>
+              <Th>IFSC</Th>
+              <Th>Account Holder</Th>
+              <Th align="center">Acc #</Th>
+              <Th align="right">Balance</Th>
+              <Th align="right">Paid Lifetime</Th>
+              <Th align="center">Action</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((b) => (
+              <tr key={b.userId} className="border-b border-gray-100 hover:bg-emerald-50/30">
+                <Td className="text-xs whitespace-nowrap text-gray-500">{fmtDateTime(b.updatedAt || b.createdAt)}</Td>
+                <Td className="font-medium">{b.userName}</Td>
+                <Td>{b.userPhone ? `+91 ${b.userPhone}` : "—"}</Td>
+                <Td className="text-gray-600 text-xs">{b.district || "—"}{b.state ? `, ${b.state}` : ""}</Td>
+                <Td>
+                  {b.upiId ? <span className="font-mono text-emerald-700">{b.upiId}</span> : <span className="text-gray-400">—</span>}
+                </Td>
+                <Td>
+                  {b.ifsc ? <span className="font-mono">{b.ifsc}</span> : <span className="text-gray-400">—</span>}
+                </Td>
+                <Td>{b.accountHolder || <span className="text-gray-400">—</span>}</Td>
+                <Td align="center">
+                  {b.hasAccountNumber
+                    ? <span className="text-emerald-600 text-xs font-semibold">yes</span>
+                    : <span className="text-gray-400 text-xs">no</span>}
+                </Td>
+                <Td align="right" className={b.balance >= 10 ? "font-bold text-emerald-700" : ""}>₹{b.balance || 0}</Td>
+                <Td align="right" className="text-gray-600">₹{b.lifetimeDisbursed || 0}</Td>
+                <Td align="center">
+                  <button
+                    onClick={() => onLogManual({
+                      userId: b.userId, name: b.userName, phone: b.userPhone,
+                      upiId: b.upiId, ifsc: b.ifsc, accountHolder: b.accountHolder,
+                      defaultAmount: b.balance >= 10 ? Math.floor(b.balance / 10) * 10 : 0,
+                    })}
+                    className="px-2 py-1 bg-white border border-gray-300 text-gray-700 rounded text-xs font-semibold hover:bg-gray-50"
+                  >
+                    + Log Transfer
+                  </button>
+                </Td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr><Td colSpan={11} className="text-center text-gray-400 py-8">No matches</Td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

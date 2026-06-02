@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     const [users, ledger, banks, recentEntries, flagged, payouts, entriesForLocation] = await Promise.all([
       sb("/rest/v1/users?select=id,name,phone,email,provider,lang,created_at,last_login&order=created_at.desc&limit=2000"),
       sb("/rest/v1/earnings_ledger?select=user_id,amount"),
-      sb("/rest/v1/user_bank_accounts?select=user_id,account_holder,ifsc,upi_id,verified,updated_at"),
+      sb("/rest/v1/user_bank_accounts?select=user_id,account_holder,account_number_encrypted,ifsc,upi_id,verified,created_at,updated_at"),
       sb("/rest/v1/price_entries?select=id,user_id,commodity,price,unit,source_type,state,district,status,flagged_reason,created_at&order=created_at.desc&limit=200"),
       sb("/rest/v1/price_entries?status=eq.flagged&select=id,user_id,commodity,price,unit,source_type,state,district,flagged_reason,created_at&order=created_at.desc&limit=100"),
       sb("/rest/v1/payout_requests?select=id,user_id,amount,status,nbfc_ref,failure_reason,requested_at,completed_at&order=requested_at.desc&limit=500"),
@@ -178,6 +178,28 @@ export default async function handler(req, res) {
       createdAt: e.created_at,
     }));
 
+    // Build bankLinks list — mirrors the BankLinks tab in the Google Sheet
+    const bankLinks = (banks || []).map((b) => {
+      const loc = locationByUser[b.user_id] || {};
+      return {
+        userId: b.user_id,
+        userName: userNameById[b.user_id] || "Unknown",
+        userPhone: userPhoneById[b.user_id] || "",
+        upiId: b.upi_id || "",
+        ifsc: b.ifsc || "",
+        accountHolder: b.account_holder || "",
+        hasAccountNumber: !!b.account_number_encrypted,
+        verified: !!b.verified,
+        district: loc.district || "",
+        state: loc.state || "",
+        balance: balanceByUser[b.user_id] || 0,
+        lifetimeDisbursed: lifetimeDisbursedByUser[b.user_id] || 0,
+        createdAt: b.created_at || b.updated_at,
+        updatedAt: b.updated_at,
+      };
+    });
+    bankLinks.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+
     const totalDisbursedAllTime = Object.values(lifetimeDisbursedByUser).reduce((s, v) => s + v, 0);
     const stats = {
       totalUsers: users?.length || 0,
@@ -191,6 +213,7 @@ export default async function handler(req, res) {
       flaggedCount: flagged?.length || 0,
       totalDisbursedAllTime,
       totalPayoutCount: (payouts || []).filter((p) => p.status === "completed").length,
+      bankLinkedCount: bankLinks.length,
     };
 
     return res.status(200).json({
@@ -201,6 +224,7 @@ export default async function handler(req, res) {
       recentEntries: enrichEntries(recentEntries),
       users: userRows,
       payoutHistory,
+      bankLinks,
     });
   } catch (err) {
     return res.status(500).json({ error: "internal", detail: err.message });
