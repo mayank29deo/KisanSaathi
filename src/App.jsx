@@ -14,6 +14,7 @@ import Health from "./screens/Health";
 import Sell from "./screens/Sell";
 import Earn from "./screens/Earn";
 import AuthScreen from "./screens/AuthScreen";
+import Admin from "./screens/Admin";
 
 // Components
 import TabButton from "./components/TabButton";
@@ -21,6 +22,16 @@ import TabButton from "./components/TabButton";
 const LANG_KEY = "ks_lang";
 
 export default function App() {
+  // Admin route — bypasses the consumer app entirely.
+  // Path-based since we don't ship a router. Safe to read once at mount: changing
+  // path requires a full page navigation anyway, which remounts this component.
+  if (typeof window !== "undefined" && window.location.pathname.startsWith("/admin")) {
+    return <Admin />;
+  }
+  return <ConsumerApp />;
+}
+
+function ConsumerApp() {
   const { user, register, login, signInWithGoogle, updateUser, logout } = useAuth();
 
   // Persist language: prefer user profile lang, else localStorage, else "en"
