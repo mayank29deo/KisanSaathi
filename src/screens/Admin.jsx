@@ -78,7 +78,18 @@ export default function Admin() {
     });
     const j = await r.json();
     if (!r.ok) {
-      alert(`Failed: ${j.error || "unknown"}${j.detail ? "\n\n" + JSON.stringify(j.detail) : ""}`);
+      // Stale dashboard is the most common cause — re-fetch immediately and tell the
+      // admin what the server actually sees so they can decide what to do next.
+      if (j.error === "balance_too_low") {
+        alert(
+          `Server says this user's balance is ₹${j.balance ?? "?"} (below the ₹10 minimum).\n\n` +
+          `Your dashboard may be stale. Refreshing now — check the updated number before retrying.\n\n` +
+          `If you still need to record a transfer (e.g. you paid in cash anyway), use the "+ Log" button instead.`
+        );
+      } else {
+        alert(`Failed: ${j.error || "unknown"}${j.detail ? "\n\n" + JSON.stringify(j.detail) : ""}`);
+      }
+      fetchDashboard();
       return;
     }
     const tag = j.adopted ? "✓ Marked existing pending payout as paid" : "✓ Payout recorded";
