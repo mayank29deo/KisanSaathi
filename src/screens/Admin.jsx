@@ -78,13 +78,11 @@ export default function Admin() {
     });
     const j = await r.json();
     if (!r.ok) {
-      // Stale dashboard is the most common cause — re-fetch immediately and tell the
-      // admin what the server actually sees so they can decide what to do next.
       if (j.error === "balance_too_low") {
         alert(
           `Server says this user's balance is ₹${j.balance ?? "?"} (below the ₹10 minimum).\n\n` +
           `Your dashboard may be stale. Refreshing now — check the updated number before retrying.\n\n` +
-          `If you still need to record a transfer (e.g. you paid in cash anyway), use the "+ Log" button instead.`
+          `If you still need to record a transfer, use the "+ Log" button instead.`
         );
       } else {
         alert(`Failed: ${j.error || "unknown"}${j.detail ? "\n\n" + JSON.stringify(j.detail) : ""}`);
@@ -92,8 +90,7 @@ export default function Admin() {
       fetchDashboard();
       return;
     }
-    const tag = j.adopted ? "✓ Marked existing pending payout as paid" : "✓ Payout recorded";
-    alert(`${tag}: ₹${j.amount}\nRef: ${j.reference}`);
+    // success: no popup — just refresh. row disappears from Payouts Ready, appears in History.
     fetchDashboard();
   }
 
@@ -362,20 +359,30 @@ function PayoutsTable({ rows, onMarkPaid, onLogManual }) {
             <Th align="right">Balance</Th>
             <Th align="right">Disburse</Th>
             <Th align="right">Paid Lifetime</Th>
+            <Th>Last Paid</Th>
             <Th>UPI / Bank</Th>
             <Th>Holder</Th>
             <Th align="center">Action</Th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((p) => (
-            <tr key={p.userId} className="border-b border-gray-100 hover:bg-emerald-50/40">
+          {rows.map((p) => {
+            const recentlyPaid = p.lastPaidAt && hoursSince(p.lastPaidAt) < 24;
+            return (
+            <tr key={p.userId} className={`border-b border-gray-100 ${recentlyPaid ? "bg-amber-50/30" : "hover:bg-emerald-50/40"}`}>
               <Td className="font-semibold">{p.name}</Td>
               <Td>{p.phone ? `+91 ${p.phone}` : "—"}</Td>
               <Td className="text-gray-600 text-xs">{p.district || "—"}{p.state ? `, ${p.state}` : ""}</Td>
               <Td align="right" className="font-semibold">₹{p.balance}</Td>
               <Td align="right" className="font-bold text-emerald-700">₹{p.payoutAmount}</Td>
               <Td align="right" className="text-gray-600">₹{p.lifetimeDisbursed || 0}</Td>
+              <Td className="text-xs">
+                {p.lastPaidAt ? (
+                  <span className={recentlyPaid ? "text-amber-700 font-semibold" : "text-gray-500"}>
+                    {fmtRelative(p.lastPaidAt)}{recentlyPaid ? ` (₹${p.lastPaidAmount})` : ""}
+                  </span>
+                ) : <span className="text-gray-400">never</span>}
+              </Td>
               <Td>
                 {p.upiId ? (
                   <span className="font-mono text-emerald-700">{p.upiId}</span>
@@ -387,16 +394,9 @@ function PayoutsTable({ rows, onMarkPaid, onLogManual }) {
               <Td align="center">
                 <div className="flex justify-center gap-1">
                   <button
-                    onClick={() => {
-                      const dest = p.upiId || p.ifsc;
-                      const ref = prompt(
-                        `You sent ₹${p.payoutAmount} to:\n\n${p.name} (+91 ${p.phone})\n${dest}\n\nEnter Transaction ID / UTR:`
-                      );
-                      if (ref === null) return; // cancelled
-                      onMarkPaid(p.userId, ref);
-                    }}
+                    onClick={() => onMarkPaid(p.userId, "")}
                     className="px-3 py-1 bg-emerald-600 text-white rounded-md text-xs font-semibold hover:bg-emerald-700"
-                    title="Record this transfer — debits balance, adds to history"
+                    title="One-click record — server auto-generates a reference"
                   >
                     Mark Paid ₹{p.payoutAmount}
                   </button>
@@ -407,14 +407,15 @@ function PayoutsTable({ rows, onMarkPaid, onLogManual }) {
                       defaultAmount: p.payoutAmount,
                     })}
                     className="px-2 py-1 bg-white border border-gray-300 text-gray-700 rounded-md text-xs font-semibold hover:bg-gray-50"
-                    title="Log a manual/retroactive transfer"
+                    title="Log a custom transfer (specify amount, method, date)"
                   >
                     + Log
                   </button>
                 </div>
               </Td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -864,14 +865,14 @@ function LogPayoutModal({ user, onClose, onSubmit }) {
 
             <div>
               <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">
-                Transaction ID / UTR / Reference
+                Reference <span className="normal-case font-normal text-gray-400">(optional — leave blank if no UTR)</span>
               </label>
               <input
                 type="text"
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                placeholder="e.g. UTR123456789"
+                placeholder="e.g. UTR123456789 (optional)"
               />
             </div>
 
@@ -975,4 +976,16 @@ function fmtDateTime(iso) {
     day: "numeric", month: "short", year: "2-digit",
     hour: "2-digit", minute: "2-digit", hour12: false,
   });
+}
+function hoursSince(iso) {
+  if (!iso) return Infinity;
+  return (Date.now() - new Date(iso).getTime()) / 36e5;
+}
+function fmtRelative(iso) {
+  if (!iso) return "never";
+  const h = hoursSince(iso);
+  if (h < 1) return `${Math.max(1, Math.round(h * 60))} min ago`;
+  if (h < 24) return `${Math.round(h)}h ago`;
+  if (h < 48) return "yesterday";
+  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }

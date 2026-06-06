@@ -49,12 +49,20 @@ export default async function handler(req, res) {
       bankByUser[b.user_id] = b;
     }
 
-    // Lifetime disbursed per user (sum of completed payouts)
+    // Lifetime disbursed + last paid timestamp per user
     const lifetimeDisbursedByUser = {};
     const pendingPayoutByUser = {};
+    const lastPaidByUser = {};
     for (const p of payouts || []) {
       if (p.status === "completed") {
         lifetimeDisbursedByUser[p.user_id] = (lifetimeDisbursedByUser[p.user_id] || 0) + Number(p.amount || 0);
+        const ts = p.completed_at || p.requested_at;
+        if (ts) {
+          const t = new Date(ts).getTime();
+          if (!lastPaidByUser[p.user_id] || t > new Date(lastPaidByUser[p.user_id].iso).getTime()) {
+            lastPaidByUser[p.user_id] = { iso: ts, amount: Number(p.amount || 0) };
+          }
+        }
       } else if (p.status === "pending" || p.status === "processing") {
         pendingPayoutByUser[p.user_id] = (pendingPayoutByUser[p.user_id] || 0) + Number(p.amount || 0);
       }
@@ -92,6 +100,7 @@ export default async function handler(req, res) {
       const bank = bankByUser[u.id];
       if (balance >= PAYOUT_MIN && bank && (bank.upi_id || bank.ifsc)) {
         const loc = locationByUser[u.id] || {};
+        const lastPaid = lastPaidByUser[u.id];
         payoutsReady.push({
           userId: u.id,
           name: u.name,
@@ -100,6 +109,8 @@ export default async function handler(req, res) {
           balance,
           payoutAmount: Math.floor(balance / 10) * 10,
           lifetimeDisbursed: lifetimeDisbursedByUser[u.id] || 0,
+          lastPaidAt: lastPaid?.iso || null,
+          lastPaidAmount: lastPaid?.amount || 0,
           upiId: bank.upi_id || "",
           ifsc: bank.ifsc || "",
           accountHolder: bank.account_holder || "",
