@@ -1,21 +1,25 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import STRINGS from "./i18n/strings";
 import { useAuth } from "./hooks/useAuth";
 
-// Screens
+// Eagerly loaded — needed for the critical first paint path (home + auth).
 import Home from "./screens/Home";
-import Mandi from "./screens/Mandi";
-import Finance from "./screens/Finance";
-import Advisory from "./screens/Advisory";
-import Detector from "./screens/Detector";
-import Health from "./screens/Health";
-import Sell from "./screens/Sell";
-import Earn from "./screens/Earn";
 import AuthScreen from "./screens/AuthScreen";
-import Admin from "./screens/Admin";
+
+// Lazily loaded — only fetched when the user navigates to that tab/route.
+// Cuts ~250 KB off the initial bundle so first paint on slow mobile networks
+// (rural 3G/4G) is much faster.
+const Mandi    = lazy(() => import("./screens/Mandi"));
+const Finance  = lazy(() => import("./screens/Finance"));
+const Advisory = lazy(() => import("./screens/Advisory"));
+const Detector = lazy(() => import("./screens/Detector"));
+const Health   = lazy(() => import("./screens/Health"));
+const Sell     = lazy(() => import("./screens/Sell"));
+const Earn     = lazy(() => import("./screens/Earn"));
+const Admin    = lazy(() => import("./screens/Admin"));
 
 // Components
 import TabButton from "./components/TabButton";
@@ -25,12 +29,26 @@ import { isAdminEmail } from "./config/adminEmails";
 
 const LANG_KEY = "ks_lang";
 
+// Tiny centered spinner shown while a lazy chunk loads. Used as the
+// <Suspense> fallback for screen-level code splits.
+function ScreenLoader() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <div className="w-8 h-8 rounded-full border-2 border-emerald-200 border-t-emerald-600 animate-spin" />
+    </div>
+  );
+}
+
 export default function App() {
   // Admin route — bypasses the consumer app entirely.
   // Path-based since we don't ship a router. Safe to read once at mount: changing
   // path requires a full page navigation anyway, which remounts this component.
   if (typeof window !== "undefined" && window.location.pathname.startsWith("/admin")) {
-    return <Admin />;
+    return (
+      <Suspense fallback={<ScreenLoader />}>
+        <Admin />
+      </Suspense>
+    );
   }
   return <ConsumerApp />;
 }
@@ -126,14 +144,18 @@ function ConsumerApp() {
       {/* Body */}
       <div className="flex-1 p-4 overflow-y-auto pb-20">
         <AnimatePresence mode="wait">
+          {/* Home is eager — it's the landing screen. Everything else is
+              lazily loaded so the initial bundle stays small. */}
           {tab === "home" && <Home t={t} setTab={setTab} user={user} />}
-          {tab === "mandi" && <Mandi t={t} />}
-          {tab === "finance" && <Finance t={t} />}
-          {tab === "advisory" && <Advisory t={t} />}
-          {tab === "detect" && <Detector t={t} />}
-          {tab === "health" && <Health t={t} />}
-          {tab === "sell" && <Sell t={t} />}
-          {tab === "earn" && <Earn t={t} user={user} />}
+          <Suspense fallback={<ScreenLoader />}>
+            {tab === "mandi" && <Mandi t={t} />}
+            {tab === "finance" && <Finance t={t} />}
+            {tab === "advisory" && <Advisory t={t} />}
+            {tab === "detect" && <Detector t={t} />}
+            {tab === "health" && <Health t={t} />}
+            {tab === "sell" && <Sell t={t} />}
+            {tab === "earn" && <Earn t={t} user={user} />}
+          </Suspense>
         </AnimatePresence>
       </div>
 
