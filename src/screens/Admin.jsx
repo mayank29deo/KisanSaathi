@@ -346,10 +346,11 @@ function TabBtn({ active, onClick, count, children, red }) {
 
 function PayoutsTable({ rows, onMarkPaid, onLogManual }) {
   const [showRecent, setShowRecent] = useState(false);
-  const COOLDOWN_HOURS = 24;
+  const COOLDOWN_HOURS = 12;
 
-  // Users paid in the last 24h are hidden by default — they may have accrued
-  // fresh credits but admin probably doesn't want to disburse twice in a day.
+  // Users paid in the last COOLDOWN_HOURS are hidden by default — fresh
+  // credits may have accrued but admin usually doesn't want to disburse
+  // twice within the same shift.
   const visibleRows = rows.filter((p) => {
     if (showRecent) return true;
     return !p.lastPaidAt || hoursSince(p.lastPaidAt) >= COOLDOWN_HOURS;
@@ -363,8 +364,8 @@ function PayoutsTable({ rows, onMarkPaid, onLogManual }) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
         <div className="text-4xl mb-2">✅</div>
-        <div className="font-semibold text-gray-700">All {hiddenCount} pending {hiddenCount === 1 ? "user was" : "users were"} paid in the last 24h</div>
-        <div className="text-sm text-gray-500 mt-1">Fresh accruals will surface again tomorrow.</div>
+        <div className="font-semibold text-gray-700">All {hiddenCount} pending {hiddenCount === 1 ? "user was" : "users were"} paid in the last 12h</div>
+        <div className="text-sm text-gray-500 mt-1">Fresh accruals will surface again in the next shift.</div>
         <button
           onClick={() => setShowRecent(true)}
           className="mt-4 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-sm font-medium"
@@ -379,7 +380,7 @@ function PayoutsTable({ rows, onMarkPaid, onLogManual }) {
       {hiddenCount > 0 && (
         <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
           <span className="text-sm text-amber-800">
-            <span className="font-semibold">{hiddenCount}</span> {hiddenCount === 1 ? "user is" : "users are"} hidden — already paid in the last 24h
+            <span className="font-semibold">{hiddenCount}</span> {hiddenCount === 1 ? "user is" : "users are"} hidden — already paid in the last 12h
           </span>
           <label className="text-sm font-medium text-amber-700 cursor-pointer flex items-center gap-2 select-none">
             <input
@@ -410,7 +411,7 @@ function PayoutsTable({ rows, onMarkPaid, onLogManual }) {
           </thead>
           <tbody>
               {visibleRows.map((p) => {
-              const recentlyPaid = p.lastPaidAt && hoursSince(p.lastPaidAt) < 24;
+              const recentlyPaid = p.lastPaidAt && hoursSince(p.lastPaidAt) < COOLDOWN_HOURS;
               return (
               <tr key={p.userId} className={`border-b border-gray-100 ${recentlyPaid ? "bg-amber-50/30" : "hover:bg-emerald-50/40"}`}>
               <Td className="font-semibold">{p.name}</Td>
