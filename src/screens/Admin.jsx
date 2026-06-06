@@ -345,31 +345,74 @@ function TabBtn({ active, onClick, count, children, red }) {
 }
 
 function PayoutsTable({ rows, onMarkPaid, onLogManual }) {
+  const [showRecent, setShowRecent] = useState(false);
+  const COOLDOWN_HOURS = 24;
+
+  // Users paid in the last 24h are hidden by default — they may have accrued
+  // fresh credits but admin probably doesn't want to disburse twice in a day.
+  const visibleRows = rows.filter((p) => {
+    if (showRecent) return true;
+    return !p.lastPaidAt || hoursSince(p.lastPaidAt) >= COOLDOWN_HOURS;
+  });
+  const hiddenCount = rows.length - visibleRows.length;
+
   if (rows.length === 0) {
     return <EmptyState icon="🪙" title="No payouts ready" subtitle="When a user crosses ₹10 with a linked bank/UPI, they'll appear here." />;
   }
+  if (visibleRows.length === 0 && hiddenCount > 0) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+        <div className="text-4xl mb-2">✅</div>
+        <div className="font-semibold text-gray-700">All {hiddenCount} pending {hiddenCount === 1 ? "user was" : "users were"} paid in the last 24h</div>
+        <div className="text-sm text-gray-500 mt-1">Fresh accruals will surface again tomorrow.</div>
+        <button
+          onClick={() => setShowRecent(true)}
+          className="mt-4 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-sm font-medium"
+        >
+          Show them anyway
+        </button>
+      </div>
+    );
+  }
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b border-gray-200">
-          <tr className="text-left text-xs font-semibold text-gray-600 uppercase">
-            <Th>User</Th>
-            <Th>Phone</Th>
-            <Th>Location</Th>
-            <Th align="right">Balance</Th>
-            <Th align="right">Disburse</Th>
-            <Th align="right">Paid Lifetime</Th>
-            <Th>Last Paid</Th>
-            <Th>UPI / Bank</Th>
-            <Th>Holder</Th>
-            <Th align="center">Action</Th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((p) => {
-            const recentlyPaid = p.lastPaidAt && hoursSince(p.lastPaidAt) < 24;
-            return (
-            <tr key={p.userId} className={`border-b border-gray-100 ${recentlyPaid ? "bg-amber-50/30" : "hover:bg-emerald-50/40"}`}>
+    <div>
+      {hiddenCount > 0 && (
+        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+          <span className="text-sm text-amber-800">
+            <span className="font-semibold">{hiddenCount}</span> {hiddenCount === 1 ? "user is" : "users are"} hidden — already paid in the last 24h
+          </span>
+          <label className="text-sm font-medium text-amber-700 cursor-pointer flex items-center gap-2 select-none">
+            <input
+              type="checkbox"
+              checked={showRecent}
+              onChange={(e) => setShowRecent(e.target.checked)}
+              className="rounded"
+            />
+            Show them anyway
+          </label>
+        </div>
+      )}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr className="text-left text-xs font-semibold text-gray-600 uppercase">
+              <Th>User</Th>
+              <Th>Phone</Th>
+              <Th>Location</Th>
+              <Th align="right">Balance</Th>
+              <Th align="right">Disburse</Th>
+              <Th align="right">Paid Lifetime</Th>
+              <Th>Last Paid</Th>
+              <Th>UPI / Bank</Th>
+              <Th>Holder</Th>
+              <Th align="center">Action</Th>
+            </tr>
+          </thead>
+          <tbody>
+              {visibleRows.map((p) => {
+              const recentlyPaid = p.lastPaidAt && hoursSince(p.lastPaidAt) < 24;
+              return (
+              <tr key={p.userId} className={`border-b border-gray-100 ${recentlyPaid ? "bg-amber-50/30" : "hover:bg-emerald-50/40"}`}>
               <Td className="font-semibold">{p.name}</Td>
               <Td>{p.phone ? `+91 ${p.phone}` : "—"}</Td>
               <Td className="text-gray-600 text-xs">{p.district || "—"}{p.state ? `, ${p.state}` : ""}</Td>
@@ -414,10 +457,11 @@ function PayoutsTable({ rows, onMarkPaid, onLogManual }) {
                 </div>
               </Td>
             </tr>
-            );
-          })}
-        </tbody>
-      </table>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
