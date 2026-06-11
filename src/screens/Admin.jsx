@@ -73,7 +73,13 @@ export default function Admin() {
     const token = await fbUser.getIdToken();
     const r = await fetch("/api/admin/mark-paid", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        // Same key on retry returns the cached server response, so a
+        // network blip during the request won't create a double-debit.
+        "Idempotency-Key": crypto.randomUUID(),
+      },
       body: JSON.stringify({ userId, nbfcRef }),
     });
     const j = await r.json();
@@ -96,12 +102,19 @@ export default function Admin() {
 
   async function logPayout({ userId, amount, method, reference, transferDate }) {
     const token = await fbUser.getIdToken();
-    return logPayoutInner({ userId, amount, method, reference, transferDate, force: false }, token);
+    // Generate one key per logical action — reused if we re-submit with
+    // force=true after the over-balance confirm. Server dedupes by key.
+    const idemKey = crypto.randomUUID();
+    return logPayoutInner({ userId, amount, method, reference, transferDate, force: false }, token, idemKey);
 
-    async function logPayoutInner(body, tk) {
+    async function logPayoutInner(body, tk, key) {
       const r = await fetch("/api/admin/log-payout", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tk}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${tk}`,
+          "Idempotency-Key": key,
+        },
         body: JSON.stringify(body),
       });
       const j = await r.json();
@@ -116,7 +129,9 @@ export default function Admin() {
             `Click OK to force, Cancel to abort.`
           );
           if (!proceed) return false;
-          return logPayoutInner({ ...body, force: true }, tk);
+          // Force-retry uses a NEW idempotency key (different logical
+          // request — different body — so dedupe must treat it as new).
+          return logPayoutInner({ ...body, force: true }, tk, crypto.randomUUID());
         }
         alert(`Failed: ${j.error || "unknown"}`);
         return false;

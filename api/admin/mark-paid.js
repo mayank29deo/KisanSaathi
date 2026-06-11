@@ -1,21 +1,26 @@
 /**
  * POST /api/admin/mark-paid  { userId, nbfcRef? }
  *
- * Records that you've disbursed money to a user. Simple flow:
- *
- *   1. If user already has a pending/processing payout, mark THAT one completed
- *      with your reference (don't create a duplicate or double-debit).
+ * Records that the admin disbursed money to a user. One-click flow:
+ *   1. If user already has a pending/processing payout (from old code paths),
+ *      flip it to completed with the new ref. No re-debit (ledger was
+ *      already hit when the pending row was created).
  *   2. Otherwise, create a fresh completed payout_requests row and debit
- *      the earnings_ledger by the floored ₹10-multiple of their current balance.
+ *      earnings_ledger by floor(balance/10)*10. Never disburses more
+ *      than the user has earned.
  *
- * No RPC, no two-step. Trust the admin: if you're clicking this, the transfer
- * happened. We just record it.
+ * Headers:
+ *   Idempotency-Key (optional): caller-generated UUID. Same key returns the
+ *     cached response on retry.
+ *
+ * Atomicity: all writes happen inside a single PL/pgSQL function
+ * (mark_payout_completed) which holds FOR UPDATE row locks on the user's
+ * earnings_ledger AND any pending payout row for the whole call. Two
+ * concurrent admin clicks cannot both pass the balance check and double-debit.
  *
  * Requires admin Firebase ID token.
  */
 import { requireAdmin, setAdminCors, sb } from "./_auth.js";
-
-const PAYOUT_MIN = 10;
 
 export default async function handler(req, res) {
   setAdminCors(res);
@@ -29,75 +34,56 @@ export default async function handler(req, res) {
   if (!userId) return res.status(400).json({ error: "missing_userId" });
 
   const ref = (nbfcRef && nbfcRef.trim()) || `manual_${guard.email}_${Date.now()}`;
-  const now = new Date().toISOString();
+  const idemKey = req.headers["idempotency-key"];
 
   try {
-    // Step 1: any in-flight payout for this user? Adopt it instead of double-debiting.
-    const pending = await sb(
-      `/rest/v1/payout_requests?user_id=eq.${encodeURIComponent(userId)}&status=in.(pending,processing)&select=id,amount&order=requested_at.asc&limit=1`
-    );
-    const existing = pending?.[0];
-
-    if (existing) {
-      // Adopt: flip the existing pending row to completed with the new ref.
-      // Ledger was already debited by request_payout RPC when the pending row
-      // was created, so no need to debit again.
-      await sb(`/rest/v1/payout_requests?id=eq.${encodeURIComponent(existing.id)}`, {
-        method: "PATCH",
-        body: { status: "completed", nbfc_ref: ref, completed_at: now },
-        headers: { Prefer: "return=minimal" },
-      });
-      return res.status(200).json({
-        ok: true,
-        adopted: true,
-        payoutId: existing.id,
-        amount: Number(existing.amount),
-        reference: ref,
-      });
+    // Idempotency short-circuit
+    if (idemKey) {
+      const cached = await sb(
+        `/rest/v1/idempotency_keys?key=eq.${encodeURIComponent(idemKey)}&user_id=eq.${encodeURIComponent(guard.email)}&select=response`
+      );
+      if (cached?.[0]?.response) {
+        return res.status(200).json(cached[0].response);
+      }
     }
 
-    // Step 2: no pending payout. Compute payout amount from current balance.
-    const ledgerRows = await sb(
-      `/rest/v1/earnings_ledger?user_id=eq.${encodeURIComponent(userId)}&select=amount`
-    );
-    const balance = (ledgerRows || []).reduce((s, r) => s + Number(r.amount || 0), 0);
-    if (balance < PAYOUT_MIN) {
-      return res.status(409).json({ error: "balance_too_low", balance });
-    }
-    const amount = Math.floor(balance / 10) * 10;
-
-    // Insert completed payout row
-    const payoutRows = await sb(`/rest/v1/payout_requests`, {
+    // Single atomic call — balance lock + adopt-or-create + debit
+    const rpc = await sb(`/rest/v1/rpc/mark_payout_completed`, {
       method: "POST",
       body: {
-        user_id: userId,
-        amount,
-        status: "completed",
-        nbfc_ref: ref,
-        requested_at: now,
-        completed_at: now,
+        p_user_id:     userId,
+        p_nbfc_ref:    ref,
+        p_admin_email: guard.email,
       },
-      headers: { Prefer: "return=representation" },
     });
-    const payoutId = payoutRows?.[0]?.id;
-    if (!payoutId) {
-      return res.status(500).json({ error: "payout_insert_failed", detail: payoutRows });
+
+    if (rpc?.error === "balance_too_low") {
+      return res.status(409).json({ error: "balance_too_low", balance: Number(rpc.balance) });
+    }
+    if (rpc?.error || !rpc?.payout_id) {
+      return res.status(500).json({ error: rpc?.error || "rpc_failed", detail: rpc });
     }
 
-    // Debit ledger
-    await sb(`/rest/v1/earnings_ledger`, {
-      method: "POST",
-      body: {
-        user_id: userId,
-        type: "payout",
-        amount: -amount,
-        reference_id: payoutId,
-        description: `Payout marked by ${guard.email} — ref: ${ref}`,
-      },
-      headers: { Prefer: "return=minimal" },
-    });
+    const response = {
+      ok:        true,
+      adopted:   !!rpc.adopted,
+      payoutId:  rpc.payout_id,
+      amount:    Number(rpc.amount),
+      reference: rpc.reference || ref,
+      newBalance: rpc.new_balance !== undefined ? Number(rpc.new_balance) : undefined,
+    };
 
-    return res.status(200).json({ ok: true, payoutId, amount, reference: ref });
+    if (idemKey) {
+      try {
+        await sb(`/rest/v1/idempotency_keys`, {
+          method: "POST",
+          body: { key: idemKey, user_id: guard.email, response },
+          headers: { Prefer: "return=minimal" },
+        });
+      } catch {}
+    }
+
+    return res.status(200).json(response);
   } catch (err) {
     return res.status(500).json({ error: "internal", detail: err.message });
   }
