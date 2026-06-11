@@ -4,20 +4,11 @@
 -- Run this once in the Supabase SQL editor. It is idempotent — safe to
 -- re-run; creates-or-replaces the new RPCs without dropping existing data.
 --
--- What this adds:
---   1. log_manual_payout(p_user_id, p_amount, p_method, p_reference,
---      p_transfer_date, p_admin_email, p_force) — atomic balance-check +
---      payout insert + ledger debit, all under FOR UPDATE row locks.
---      Replaces the multi-call REST sequence in api/admin/log-payout.js.
---
---   2. mark_payout_completed(p_user_id, p_nbfc_ref, p_admin_email) —
---      atomic adopt-pending OR create-new-completed payout flow.
---      Replaces the multi-call REST sequence in api/admin/mark-paid.js.
---
--- Both functions lock earnings_ledger rows for the target user before
--- computing balance, so two concurrent admin clicks cannot both pass
--- the balance check and double-debit. The FOR UPDATE lock is held for
--- the full function call (since PL/pgSQL runs each call as one tx).
+-- 2026-06-11 v2: switched from SELECT ... FOR UPDATE (invalid on aggregate
+-- queries — Postgres error 0A000) to pg_advisory_xact_lock keyed by user_id.
+-- Advisory locks are transaction-scoped, automatically released on COMMIT,
+-- and actually serialize ALL operations on a user's ledger (FOR UPDATE only
+-- would have locked existing rows, leaving new INSERTs unblocked).
 -- =============================================================
 
 
@@ -41,18 +32,23 @@ begin
     return jsonb_build_object('error', 'invalid_amount');
   end if;
 
+  -- Transaction-scoped advisory lock keyed by user_id. Any other
+  -- concurrent call for the same user waits here until we commit.
+  -- Released automatically on COMMIT/ROLLBACK. The 'ks_ledger_' prefix
+  -- namespaces our locks so they don't collide with any other code.
+  perform pg_advisory_xact_lock(hashtext('ks_ledger_' || p_user_id));
+
   select exists(select 1 from users where id = p_user_id) into v_user_exists;
   if not v_user_exists then
     return jsonb_build_object('error', 'user_not_found');
   end if;
 
-  -- Lock ledger rows for this user. Held for the whole function call.
+  -- Safe now: advisory lock prevents another tx from inserting
+  -- concurrent debits/credits between this read and the writes below.
   select coalesce(sum(amount), 0) into v_balance
     from earnings_ledger
-    where user_id = p_user_id
-    for update;
+    where user_id = p_user_id;
 
-  -- Balance guard (skippable only with p_force=true)
   if not p_force and p_amount > v_balance then
     return jsonb_build_object(
       'error',           'insufficient_balance',
@@ -61,13 +57,10 @@ begin
     );
   end if;
 
-  -- Create the payout (status=completed since admin is recording an
-  -- already-disbursed transfer)
   insert into payout_requests(user_id, amount, status, nbfc_ref, requested_at, completed_at)
     values (p_user_id, p_amount, 'completed', p_reference, p_transfer_date, p_transfer_date)
     returning id into v_payout_id;
 
-  -- Debit ledger
   insert into earnings_ledger(user_id, type, amount, reference_id, description, created_at)
     values (
       p_user_id,
@@ -102,15 +95,14 @@ declare
   v_amount          numeric;
   v_payout_id       uuid;
 begin
-  -- Lock ledger first so no concurrent debit can race us
-  select coalesce(sum(amount), 0) into v_balance
-    from earnings_ledger
-    where user_id = p_user_id
-    for update;
+  -- Advisory lock — same key as log_manual_payout so all payout-affecting
+  -- operations on the same user serialize against each other.
+  perform pg_advisory_xact_lock(hashtext('ks_ledger_' || p_user_id));
 
   -- Adopt any in-flight pending payout (created by old request_payout
   -- RPC path). The ledger was already debited when that pending row
   -- was created, so we only flip status to completed — no re-debit.
+  -- Row-level FOR UPDATE is fine here since it's NOT an aggregate query.
   select id, amount into v_existing_id, v_existing_amount
     from payout_requests
     where user_id = p_user_id and status in ('pending', 'processing')
@@ -131,6 +123,10 @@ begin
   end if;
 
   -- No pending: balance check + fresh payout
+  select coalesce(sum(amount), 0) into v_balance
+    from earnings_ledger
+    where user_id = p_user_id;
+
   if v_balance < 10 then
     return jsonb_build_object('error', 'balance_too_low', 'balance', v_balance);
   end if;
