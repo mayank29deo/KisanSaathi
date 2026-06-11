@@ -4,13 +4,16 @@
  * Manually record a payout that was already disbursed outside the system
  * (or retroactively log historical transfers).
  *
- * Body: { userId, amount, method, reference?, transferDate? }
- *   method     : "upi" | "bank" | "mobile" | "other"
- *   reference  : transaction id / UTR / NBFC ref
- *   transferDate : ISO date string. Defaults to now.
+ * Body: { userId, amount, method, reference?, transferDate?, force? }
+ *   method      : "upi" | "bank" | "mobile" | "other"
+ *   reference   : transaction id / UTR / NBFC ref
+ *   transferDate: ISO date string. Defaults to now.
+ *   force       : if true, bypass balance check (allows over-debit). Default false.
  *
- * Atomic: creates payout_requests row (status='completed') + debits earnings_ledger
- * in the same logical transaction (single supabase round-trip for each, both must succeed).
+ * Server-side balance guard: refuses to write a debit larger than the user's
+ * current ledger balance unless `force: true`. This prevents the historical
+ * negative-balance bug where admins typed arbitrary amounts in the modal and
+ * accidentally pushed the ledger negative.
  *
  * Requires admin Firebase ID token.
  */
@@ -26,7 +29,7 @@ export default async function handler(req, res) {
   const guard = await requireAdmin(req);
   if (!guard.ok) return res.status(guard.status).json({ error: guard.error });
 
-  const { userId, amount, method, reference, transferDate } = req.body || {};
+  const { userId, amount, method, reference, transferDate, force } = req.body || {};
   if (!userId) return res.status(400).json({ error: "missing_userId" });
   const amt = Number(amount);
   if (!amt || amt <= 0) return res.status(400).json({ error: "invalid_amount" });
@@ -39,6 +42,22 @@ export default async function handler(req, res) {
     // Verify user exists
     const userRows = await sb(`/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=id,name,phone`);
     if (!userRows?.[0]) return res.status(404).json({ error: "user_not_found" });
+
+    // Balance guard — reject if amt > current ledger sum, unless explicitly forced.
+    // This is the primary defense against the over-debit class of bugs that
+    // produced negative running balances in the Sheet historically.
+    if (!force) {
+      const ledgerRows = await sb(`/rest/v1/earnings_ledger?user_id=eq.${encodeURIComponent(userId)}&select=amount`);
+      const balance = (ledgerRows || []).reduce((s, r) => s + Number(r.amount || 0), 0);
+      if (amt > balance) {
+        return res.status(409).json({
+          error: "insufficient_balance",
+          currentBalance: balance,
+          requestedAmount: amt,
+          detail: `Logging ₹${amt} would push this user's ledger to ₹${balance - amt}. Resend with force=true if intentional.`,
+        });
+      }
+    }
 
     const nbfcRef = reference?.trim() || `manual_${method}_${guard.email}_${Date.now()}`;
 

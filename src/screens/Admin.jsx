@@ -96,18 +96,34 @@ export default function Admin() {
 
   async function logPayout({ userId, amount, method, reference, transferDate }) {
     const token = await fbUser.getIdToken();
-    const r = await fetch("/api/admin/log-payout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ userId, amount, method, reference, transferDate }),
-    });
-    const j = await r.json();
-    if (!r.ok) {
-      alert(`Failed: ${j.error || "unknown"}`);
-      return false;
+    return logPayoutInner({ userId, amount, method, reference, transferDate, force: false }, token);
+
+    async function logPayoutInner(body, tk) {
+      const r = await fetch("/api/admin/log-payout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tk}` },
+        body: JSON.stringify(body),
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        // Balance guard — server refused because amount > current balance.
+        // Surface the actual numbers and let admin decide whether to override.
+        if (j.error === "insufficient_balance") {
+          const proceed = window.confirm(
+            `⚠️ Amount ₹${j.requestedAmount} exceeds current balance ₹${j.currentBalance}.\n\n` +
+            `Logging this would push the user's ledger to ₹${j.currentBalance - j.requestedAmount} (negative).\n\n` +
+            `Continue ONLY if you genuinely paid this amount off-platform and want to debit anyway.\n\n` +
+            `Click OK to force, Cancel to abort.`
+          );
+          if (!proceed) return false;
+          return logPayoutInner({ ...body, force: true }, tk);
+        }
+        alert(`Failed: ${j.error || "unknown"}`);
+        return false;
+      }
+      fetchDashboard();
+      return true;
     }
-    fetchDashboard();
-    return true;
   }
 
   async function reviewEntry(entryId, action) {
@@ -449,6 +465,7 @@ function PayoutsTable({ rows, onMarkPaid, onLogManual }) {
                       userId: p.userId, name: p.name, phone: p.phone,
                       upiId: p.upiId, ifsc: p.ifsc, accountHolder: p.accountHolder,
                       defaultAmount: p.payoutAmount,
+                      currentBalance: p.balance,
                     })}
                     className="px-2 py-1 bg-white border border-gray-300 text-gray-700 rounded-md text-xs font-semibold hover:bg-gray-50"
                     title="Log a custom transfer (specify amount, method, date)"
@@ -523,6 +540,7 @@ function UsersTable({ rows, onLogManual }) {
                       userId: u.userId, name: u.name, phone: u.phone,
                       upiId: u.bankUpi, ifsc: u.bankIfsc, accountHolder: u.bankHolder,
                       defaultAmount: u.balance >= 10 ? Math.floor(u.balance / 10) * 10 : 0,
+                      currentBalance: u.balance,
                     })}
                     className="px-2 py-1 bg-white border border-gray-300 text-gray-700 rounded text-xs font-semibold hover:bg-gray-50"
                   >
@@ -725,6 +743,7 @@ function BankLinksTable({ rows, onLogManual }) {
                       userId: b.userId, name: b.userName, phone: b.userPhone,
                       upiId: b.upiId, ifsc: b.ifsc, accountHolder: b.accountHolder,
                       defaultAmount: b.balance >= 10 ? Math.floor(b.balance / 10) * 10 : 0,
+                      currentBalance: b.balance,
                     })}
                     className="px-2 py-1 bg-white border border-gray-300 text-gray-700 rounded text-xs font-semibold hover:bg-gray-50"
                   >
@@ -864,6 +883,16 @@ function LogPayoutModal({ user, onClose, onSubmit }) {
             </p>
           </div>
 
+          {/* Current balance — primary disambiguator: shows the admin EXACTLY
+              what the server will compare amount against, so they don't accidentally
+              over-debit and burn a negative-balance scar into the ledger history. */}
+          {user.currentBalance !== undefined && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-3 text-sm flex items-center justify-between">
+              <span className="text-emerald-800 font-medium">Current balance</span>
+              <span className="font-bold text-emerald-700 text-lg">₹{user.currentBalance}</span>
+            </div>
+          )}
+
           {/* Pre-filled destination context */}
           {(user.upiId || user.ifsc) && (
             <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm">
@@ -880,10 +909,21 @@ function LogPayoutModal({ user, onClose, onSubmit }) {
                 type="number"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                max={user.currentBalance}
+                step={10}
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                  Number(amount) > (user.currentBalance ?? Infinity)
+                    ? "border-amber-400 focus:ring-amber-400 bg-amber-50"
+                    : "border-gray-200 focus:ring-emerald-400"
+                }`}
                 placeholder="e.g. 50"
                 autoFocus
               />
+              {Number(amount) > (user.currentBalance ?? Infinity) && (
+                <p className="text-amber-700 text-xs mt-1 font-medium">
+                  ⚠️ Exceeds current balance — will require override confirmation.
+                </p>
+              )}
             </div>
 
             <div>
